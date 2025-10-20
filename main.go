@@ -89,8 +89,10 @@ func runExport(cmd *cobra.Command, args []string) {
 
 	case "json":
 		log.Printf("Exporting query results to JSON: %s\n", outputPath)
-		log.Fatal("JSON format not yet implemented")
-		// TODO: implémenter plus tard
+		if err := store.ExportQueryToJSON(query, outputPath); err != nil {
+			log.Fatalf("Export failed: %v", err)
+		}
+
 	default:
 		log.Fatalf("Unsupported format: %s. Supported formats: csv, json", format)
 	}

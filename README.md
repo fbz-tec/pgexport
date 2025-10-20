@@ -6,7 +6,7 @@ A simple and powerful CLI tool to export PostgreSQL query results to various for
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to CSV format (JSON coming soon)
+- 📊 Export to CSV, JSON format (XML coming soon)
 - 🔧 Customizable CSV delimiter
 - ⚙️ Simple configuration via environment variables
 - 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
@@ -140,7 +140,11 @@ ORDER BY order_count DESC" -o user_stats.csv -d ','
 - Timestamps formatted as `2006-01-02T15:04:05.000`
 - NULL values exported as empty strings
 
-### JSON (Coming Soon)
+### JSON 
+
+JSON export
+
+### XML (Coming Soon)
 
 JSON export functionality is planned for future releases.
 
@@ -198,7 +202,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-- [ ] JSON export format
 - [ ] XML export format
 - [ ] Excel export format
 - [ ] Query pagination for large datasets

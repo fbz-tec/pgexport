@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ type Query interface {
 	Open(dbUrl string) error
 	Close() error
 	ExportQueryToCSV(query string, csvPath string, delimiter rune) error
+	ExportQueryToJSON(query string, jsonPath string) error
 }
 
 type dbStore struct {
@@ -68,6 +70,21 @@ func (store *dbStore) ExportQueryToCSV(query string, csvPath string, delimiter r
 
 	defer rows.Close()
 	if err = writePgxRowsToCSV(rows, csvPath, delimiter); err != nil {
+		return fmt.Errorf("error writing CSV file: %w", err)
+	}
+	log.Println("Successfully exported.")
+	return nil
+}
+
+func (store *dbStore) ExportQueryToJSON(query string, csvPath string) error {
+	rows, err := store.conn.Query(store.ctx, query)
+
+	if err != nil {
+		return fmt.Errorf("error executing query: %w", err)
+	}
+
+	defer rows.Close()
+	if err = writePgxRowsToJSON(rows, csvPath); err != nil {
 		return fmt.Errorf("error writing CSV file: %w", err)
 	}
 	log.Println("Successfully exported.")
@@ -129,5 +146,63 @@ func writePgxRowsToCSV(rows pgx.Rows, csvPath string, delimiter rune) error {
 		return fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	return nil
+}
+
+func writePgxRowsToJSON(rows pgx.Rows, jsonPath string) error {
+	file, err := os.Create(jsonPath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+
+	// Récupérer les noms des colonnes
+	fieldDescriptions := rows.FieldDescriptions()
+	columns := make([]string, len(fieldDescriptions))
+	for i, fd := range fieldDescriptions {
+		columns[i] = string(fd.Name)
+	}
+
+	// Get all rows and convert to a slice of maps
+	var results []map[string]interface{}
+
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return fmt.Errorf("error reading row: %w", err)
+		}
+
+		// Create a map for the row
+		entry := make(map[string]interface{})
+		for i, col := range columns {
+			if values[i] == nil {
+				entry[col] = nil
+			} else {
+				switch val := values[i].(type) {
+				case time.Time:
+					entry[col] = val.Format("2006-01-02T15:04:05.000")
+				case []byte:
+					entry[col] = string(val)
+				default:
+					entry[col] = val
+				}
+			}
+		}
+		results = append(results, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Encode to JSON
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(results); err != nil {
+		return fmt.Errorf("error encoding JSON: %w", err)
+	}
+
+	log.Printf("Successfully exported %d rows to %s\n", len(results), jsonPath)
 	return nil
 }

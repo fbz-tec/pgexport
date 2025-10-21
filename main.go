@@ -19,11 +19,31 @@ var (
 
 func main() {
 
+	log.SetFlags(log.Ldate | log.Ltime)
+
 	var rootCmd = &cobra.Command{
 		Use:   "pgexport",
-		Short: "A tool to export database query results to CSV, JSON and other formats",
-		Long:  `A CLI tool to export PostgreSQL query results to CSV, JSON and other formats.`,
-		Run:   runExport,
+		Short: "Export PostgreSQL query results to various formats",
+		Long: `A powerful CLI tool to export PostgreSQL query results to CSV, JSON and other formats.
+Supports direct SQL queries or SQL files, with customizable output options.`,
+		Example: `  # Export with inline query
+  pgexport -s "SELECT * FROM users" -o users.csv
+
+  # Export from SQL file with custom delimiter
+  pgexport -F query.sql -o output.csv -d ","
+
+  # Export to JSON
+  pgexport -s "SELECT * FROM products" -o products.json -f json`,
+		Run: runExport,
+	}
+
+	// Version command
+	var versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(GetVersionInfo())
+		},
 	}
 
 	rootCmd.Flags().StringVarP(&sqlQuery, "sql", "s", "", "SQL query to execute")
@@ -33,10 +53,10 @@ func main() {
 	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ";", "CSV delimiter character")
 
 	rootCmd.MarkFlagRequired("output")
+	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatalf("Error: %v", err)
 	}
 
 }
@@ -69,11 +89,10 @@ func runExport(cmd *cobra.Command, args []string) {
 		query = sqlQuery
 	}
 
-	store := &dbStore{}
+	store := NewStore()
 
 	dbUrl := config.GetConnectionString()
 
-	log.Println("Connecting to database...")
 	// connect to DB
 	if err := store.Open(dbUrl); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -82,25 +101,26 @@ func runExport(cmd *cobra.Command, args []string) {
 	//close connexion
 	defer store.Close()
 
-	format = strings.ToLower(format)
-	switch format {
+	log.Println("Executing query...")
+	result, err := store.ExecuteQuery(query)
 
-	case "csv":
-		log.Printf("Exporting query results to CSV: %s\n", outputPath)
-		if err := store.ExportQueryToCSV(query, outputPath, rune(delimiter[0])); err != nil {
-			log.Fatalf("Export failed: %v", err)
-		}
-
-	case "json":
-		log.Printf("Exporting query results to JSON: %s\n", outputPath)
-		if err := store.ExportQueryToJSON(query, outputPath); err != nil {
-			log.Fatalf("Export failed: %v", err)
-		}
-
-	default:
-		log.Fatalf("Unsupported format: %s. Supported formats: csv, json", format)
+	if err != nil {
+		log.Fatalf("Query execution failed: %v", err)
 	}
-	log.Println("Export completed successfully!")
+
+	format = strings.ToLower(strings.TrimSpace(format))
+
+	exporter := NewExporter()
+
+	options := ExportOptions{
+		Format:    format,
+		Delimiter: rune(delimiter[0]),
+	}
+
+	if err := exporter.Export(result, outputPath, options); err != nil {
+		log.Fatalf("Export failed: %v", err)
+	}
+
 }
 
 func readSQLFromFile(filepath string) (string, error) {

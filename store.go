@@ -2,26 +2,31 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-type Query interface {
+type QueryResult struct {
+	Columns []string
+	Rows    [][]interface{}
+}
+
+type Store interface {
 	Open(dbUrl string) error
 	Close() error
-	ExportQueryToCSV(query string, csvPath string, delimiter rune) error
-	ExportQueryToJSON(query string, jsonPath string) error
+	ExecuteQuery(query string) (*QueryResult, error)
 }
 
 type dbStore struct {
 	conn *pgx.Conn
 	ctx  context.Context
+}
+
+func NewStore() Store {
+	return &dbStore{}
 }
 
 func (store *dbStore) Open(dbUrl string) error {
@@ -53,7 +58,7 @@ func (store *dbStore) Open(dbUrl string) error {
 }
 
 func (store *dbStore) Close() error {
-	log.Println("Close DB connexion ...")
+	log.Println("Close database connexion ...")
 
 	if store.conn != nil {
 		return store.conn.Close(store.ctx)
@@ -61,148 +66,41 @@ func (store *dbStore) Close() error {
 	return nil
 }
 
-func (store *dbStore) ExportQueryToCSV(query string, csvPath string, delimiter rune) error {
+func (store *dbStore) ExecuteQuery(query string) (*QueryResult, error) {
 	rows, err := store.conn.Query(store.ctx, query)
 
 	if err != nil {
-		return fmt.Errorf("error executing query: %w", err)
+		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 
 	defer rows.Close()
-	if err = writePgxRowsToCSV(rows, csvPath, delimiter); err != nil {
-		return fmt.Errorf("error writing CSV file: %w", err)
-	}
-	log.Println("Successfully exported.")
-	return nil
-}
 
-func (store *dbStore) ExportQueryToJSON(query string, csvPath string) error {
-	rows, err := store.conn.Query(store.ctx, query)
-
-	if err != nil {
-		return fmt.Errorf("error executing query: %w", err)
-	}
-
-	defer rows.Close()
-	if err = writePgxRowsToJSON(rows, csvPath); err != nil {
-		return fmt.Errorf("error writing CSV file: %w", err)
-	}
-	log.Println("Successfully exported.")
-	return nil
-}
-
-func writePgxRowsToCSV(rows pgx.Rows, csvPath string, delimiter rune) error {
-	file, err := os.Create(csvPath)
-	if err != nil {
-		return fmt.Errorf("error creating file: %w", err)
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	writer.Comma = delimiter
-	defer writer.Flush()
-
-	// Récupérer les noms des colonnes
 	fieldDescriptions := rows.FieldDescriptions()
-	headers := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
-		headers[i] = string(fd.Name)
+	if len(fieldDescriptions) == 0 {
+		return nil, fmt.Errorf("no columns found in query result")
 	}
 
-	// Écrire les headers
-	if err := writer.Write(headers); err != nil {
-		return fmt.Errorf("error writing headers: %w", err)
-	}
-
-	// Écrire les données
-	for rows.Next() {
-		values, err := rows.Values()
-		if err != nil {
-			return fmt.Errorf("error reading row: %w", err)
-		}
-
-		// Convertir les valeurs en strings
-		record := make([]string, len(values))
-		for i, v := range values {
-			if v == nil {
-				record[i] = ""
-			} else {
-				// Formater les timestamps si nécessaire
-				switch val := v.(type) {
-				case time.Time:
-					record[i] = val.Format("2006-01-02T15:04:05.000")
-				default:
-					record[i] = fmt.Sprintf("%v", v)
-				}
-			}
-		}
-
-		if err := writer.Write(record); err != nil {
-			return fmt.Errorf("error writing row: %w", err)
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating rows: %w", err)
-	}
-
-	return nil
-}
-
-func writePgxRowsToJSON(rows pgx.Rows, jsonPath string) error {
-	file, err := os.Create(jsonPath)
-	if err != nil {
-		return fmt.Errorf("error creating file: %w", err)
-	}
-	defer file.Close()
-
-	// Récupérer les noms des colonnes
-	fieldDescriptions := rows.FieldDescriptions()
 	columns := make([]string, len(fieldDescriptions))
 	for i, fd := range fieldDescriptions {
 		columns[i] = string(fd.Name)
 	}
 
-	// Get all rows and convert to a slice of maps
-	var results []map[string]interface{}
-
+	// Fetch all rows
+	var data [][]interface{}
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
-			return fmt.Errorf("error reading row: %w", err)
+			return nil, fmt.Errorf("error reading row %d: %w", len(data)+1, err)
 		}
-
-		// Create a map for the row
-		entry := make(map[string]interface{})
-		for i, col := range columns {
-			if values[i] == nil {
-				entry[col] = nil
-			} else {
-				switch val := values[i].(type) {
-				case time.Time:
-					entry[col] = val.Format("2006-01-02T15:04:05.000")
-				case []byte:
-					entry[col] = string(val)
-				default:
-					entry[col] = val
-				}
-			}
-		}
-		results = append(results, entry)
+		data = append(data, values)
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating rows: %w", err)
+		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	// Encode to JSON
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-
-	if err := encoder.Encode(results); err != nil {
-		return fmt.Errorf("error encoding JSON: %w", err)
-	}
-
-	log.Printf("Successfully exported %d rows to %s\n", len(results), jsonPath)
-	return nil
+	return &QueryResult{
+		Columns: columns,
+		Rows:    data,
+	}, nil
 }

@@ -53,6 +53,10 @@ func runExport(cmd *cobra.Command, args []string) {
 
 	config := LoadConfig()
 
+	if err := config.Validate(); err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
 	var query string
 	var err error
 
@@ -67,7 +71,7 @@ func runExport(cmd *cobra.Command, args []string) {
 
 	store := &dbStore{}
 
-	dbUrl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", config.DBUser, config.DBPass, config.DBHost, config.DBPort, config.DBName)
+	dbUrl := config.GetConnectionString()
 
 	log.Println("Connecting to database...")
 	// connect to DB

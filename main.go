@@ -15,6 +15,7 @@ var (
 	outputPath string
 	format     string
 	delimiter  string
+	connString string
 )
 
 func main() {
@@ -54,6 +55,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json)")
 	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ";", "CSV delimiter character")
+	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
@@ -74,10 +76,19 @@ func runExport(cmd *cobra.Command, args []string) {
 		log.Fatal("Error: Cannot use both --sql and --sqlfile at the same time")
 	}
 
-	config := LoadConfig()
+	var dbUrl string
 
-	if err := config.Validate(); err != nil {
-		log.Fatalf("Configuration error: %v", err)
+	if connString != "" {
+		dbUrl = connString
+	} else {
+		config := LoadConfig()
+
+		if err := config.Validate(); err != nil {
+			log.Fatalf("Configuration error: %v", err)
+		}
+
+		dbUrl = config.GetConnectionString()
+
 	}
 
 	var query string
@@ -93,8 +104,6 @@ func runExport(cmd *cobra.Command, args []string) {
 	}
 
 	store := NewStore()
-
-	dbUrl := config.GetConnectionString()
 
 	// connect to DB
 	if err := store.Open(dbUrl); err != nil {

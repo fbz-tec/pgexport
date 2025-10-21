@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -26,6 +28,11 @@ type Config struct {
 }
 
 func LoadConfig() Config {
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("Warning: Error loading .env file: %v", err)
+		}
+	}
 	return Config{
 		DBDriver: getEnvOrDefault("DB_DRIVER", DefaultDBDriver),
 		DBUser:   getEnvOrDefault("DB_USER", DefaultDBUser),

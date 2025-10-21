@@ -24,7 +24,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:   "pgexport",
 		Short: "Export PostgreSQL query results to various formats",
-		Long: `A powerful CLI tool to export PostgreSQL query results to CSV, JSON and other formats.
+		Long: `A powerful CLI tool to export PostgreSQL query results to CSV, JSON, XML and other formats.
 Supports direct SQL queries or SQL files, with customizable output options.`,
 		Example: `  # Export with inline query
   pgexport -s "SELECT * FROM users" -o users.csv
@@ -33,7 +33,10 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
   pgexport -F query.sql -o output.csv -d ","
 
   # Export to JSON
-  pgexport -s "SELECT * FROM products" -o products.json -f json`,
+  pgexport -s "SELECT * FROM products" -o products.json -f json
+  
+  # Export to XML
+  pgexport -s "SELECT * FROM orders" -o orders.xml -f xml`,
 		Run: runExport,
 	}
 

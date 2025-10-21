@@ -1,12 +1,12 @@
 # pgexport
 
-A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, JSON).
+A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, JSON, XML).
 
 ## ✨ Features
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to CSV and JSON formats
+- 📊 Export to CSV, JSON and XML formats
 - 🔧 Customizable CSV delimiter
 - ⚙️ Simple configuration via environment variables
 - 🛡️ Robust error handling and validation
@@ -101,7 +101,7 @@ pgexport [command] [flags]
 | `--sql` | `-s` | SQL query to execute | - | * |
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
-| `--format` | `-f` | Output format (csv, json) | `csv` | No |
+| `--format` | `-f` | Output format (csv, json, xml) | `csv` | No |
 | `--delimiter` | `-d` | CSV delimiter character | `;` | No |
 | `--help` | `-h` | Show help message | - | No |
 
@@ -112,7 +112,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 #### Basic Examples
 
 ```bash
-# Simple query export
+# Simple query export to CSV
 pgexport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
 # Export with comma delimiter
@@ -123,6 +123,9 @@ pgexport -F queries/monthly_report.sql -o report.csv
 
 # Export to JSON format
 pgexport -s "SELECT * FROM products" -o products.json -f json
+
+# Export to XML format
+pgexport -s "SELECT * FROM orders" -o orders.xml -f xml
 
 # Check version
 pgexport version
@@ -154,6 +157,11 @@ pgexport --sql "SELECT * FROM stations ORDER BY name" \
          --output stations.csv \
          --format csv \
          --delimiter ';'
+
+# Export same data in different formats
+pgexport -s "SELECT * FROM products" -o products.csv -f csv
+pgexport -s "SELECT * FROM products" -o products.json -f json
+pgexport -s "SELECT * FROM products" -o products.xml -f xml
 ```
 
 #### Batch Processing Examples
@@ -171,6 +179,11 @@ else
   echo "Export failed!"
   exit 1
 fi
+
+# Export in all formats
+for fmt in csv json xml; do
+  pgexport -s "SELECT * FROM sales" -o "sales.$fmt" -f "$fmt"
+done
 ```
 
 ## 📊 Output Formats
@@ -216,6 +229,34 @@ id;name;email;created_at
 ]
 ```
 
+### XML
+
+- Pretty-printed with 2-space indentation
+- Structured with `<results>` root and `<row>` elements
+- Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
+- Timestamps formatted as `2006-01-02T15:04:05.000`
+- NULL values exported as empty strings
+- Buffered I/O for optimal performance
+
+**Example output:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<results>
+  <row>
+    <id>1</id>
+    <name>John Doe</name>
+    <email>john@example.com</email>
+    <created_at>2024-01-15T10:30:00.000</created_at>
+  </row>
+  <row>
+    <id>2</id>
+    <name>Jane Smith</name>
+    <email>jane@example.com</email>
+    <created_at>2024-01-16T14:22:15.000</created_at>
+  </row>
+</results>
+```
+
 ## 🏗️ Project Structure
 
 ```
@@ -223,7 +264,7 @@ pgexport/
 ├── main.go           # CLI entry point and orchestration
 ├── config.go         # Configuration management with validation
 ├── store.go          # Database operations (connection, queries)
-├── exporter.go       # Export operations (CSV, JSON formatting)
+├── exporter.go       # Export operations (CSV, JSON, XML formatting)
 ├── version.go        # Version information
 ├── go.mod            # Go module definition
 ├── go.sum            # Go module checksums
@@ -287,6 +328,7 @@ The tool provides clear error messages for common issues:
 - **SQL errors**: Verify your query syntax
 - **File errors**: Ensure write permissions for output directory
 - **Configuration errors**: Validate all required environment variables
+- **Format errors**: Supported formats are csv, json, and xml
 
 Example error output:
 ```
@@ -316,7 +358,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🗺️ Roadmap
 
-- [ ] XML export format
+- [x] ~~XML export format~~ ✅ Implemented!
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets
 - [ ] Progress bar for long-running queries

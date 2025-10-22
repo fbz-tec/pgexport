@@ -44,7 +44,7 @@ vendor/
 # Logs
 *.log
 
-# SQL test files (optionnel, à commenter si vous voulez versionner vos fichiers SQL)
+# SQL test files (optional)
 # *.sql
 
 # Temporary files

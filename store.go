@@ -67,6 +67,11 @@ func (store *dbStore) Close() error {
 }
 
 func (store *dbStore) ExecuteQuery(query string) (*QueryResult, error) {
+
+	if store.conn == nil {
+		return nil, fmt.Errorf("no connection to database")
+	}
+
 	rows, err := store.conn.Query(store.ctx, query)
 
 	if err != nil {

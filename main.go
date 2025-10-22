@@ -23,21 +23,21 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
 
 	var rootCmd = &cobra.Command{
-		Use:   "pgexport",
+		Use:   "pgxport",
 		Short: "Export PostgreSQL query results to various formats",
 		Long: `A powerful CLI tool to export PostgreSQL query results to CSV, JSON, XML and other formats.
 Supports direct SQL queries or SQL files, with customizable output options.`,
 		Example: `  # Export with inline query
-  pgexport -s "SELECT * FROM users" -o users.csv
+  pgxport -s "SELECT * FROM users" -o users.csv
 
   # Export from SQL file with custom delimiter
-  pgexport -F query.sql -o output.csv -d ","
+  pgxport -F query.sql -o output.csv -d ","
 
   # Export to JSON
-  pgexport -s "SELECT * FROM products" -o products.json -f json
+  pgxport -s "SELECT * FROM products" -o products.json -f json
   
   # Export to XML
-  pgexport -s "SELECT * FROM orders" -o orders.xml -f xml`,
+  pgxport -s "SELECT * FROM orders" -o orders.xml -f xml`,
 		Run: runExport,
 	}
 

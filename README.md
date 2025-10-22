@@ -1,4 +1,4 @@
-# pgexport
+# pgxport
 
 A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV,XML,JSON ..).
 
@@ -25,28 +25,28 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 ### Build from source
 
 # Export same data in different formats
-pgexport -s "SELECT * FROM products" -o products.csv -f csv
-pgexport -s "SELECT * FROM products" -o products.json -f json
-pgexport -s "SELECT * FROM products" -o products.xml -f xml
+pgxport -s "SELECT * FROM products" -o products.csv -f csv
+pgxport -s "SELECT * FROM products" -o products.json -f json
+pgxport -s "SELECT * FROM products" -o products.xml -f xml
 ```bash
 # Clone the repository
-git clone https://github.com/fbz-tec/pgexport.git
-cd pgexport
+git clone https://github.com/fbz-tec/pgxport.git
+cd pgxport
 
 # Install dependencies
 go mod download
 
 # Build the binary
-go build -o pgexport
+go build -o pgxport
 
 # (Optional) Install to your PATH
-sudo cp pgexport /usr/local/bin/
+sudo cp pgxport /usr/local/bin/
 ```
 
 ### Quick install (one-liner)
 
 ```bash
-go install github.com/fbz-tec/pgexport@latest
+go install github.com/fbz-tec/pgxport@latest
 ```
 
 ## ⚙️ Configuration
@@ -63,7 +63,7 @@ DB_PORT=5432
 DB_NAME=mydb
 ```
 
-The `.env` file is automatically loaded when you run `pgexport`. No need to export variables!
+The `.env` file is automatically loaded when you run `pgxport`. No need to export variables!
 
 **Advantages:**
 - ✅ No need to export variables every time
@@ -86,9 +86,9 @@ export DB_NAME=your_database
 Pass the connection string directly via command line:
 
 ```bash
-pgexport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
+pgxport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
 # or with short flag
-pgexport -c "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
+pgxport -c "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
 ```
 
 ### Configuration Priority
@@ -115,16 +115,16 @@ The system uses the following priority order:
 ## 📖 Usage
 
 ```bash
-pgexport [command] [flags]
+pgxport [command] [flags]
 ```
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| `pgexport` | Execute query and export results |
-| `pgexport version` | Show version information |
-| `pgexport --help` | Show help message |
+| `pgxport` | Execute query and export results |
+| `pgxport version` | Show version information |
+| `pgxport --help` | Show help message |
 
 ### Flags
 
@@ -146,39 +146,39 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 
 ```bash
 # Simple query export (uses .env file)
-pgexport -s "SELECT * FROM users WHERE active = true" -o users.csv
+pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
 # Export with comma delimiter
-pgexport -s "SELECT id, name, email FROM users" -o users.csv -d ','
+pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ','
 
 # Execute query from a SQL file
-pgexport -F queries/monthly_report.sql -o report.csv
+pgxport -F queries/monthly_report.sql -o report.csv
 
 # Export to JSON format
-pgexport -s "SELECT * FROM products" -o products.json -f json
+pgxport -s "SELECT * FROM products" -o products.json -f json
 
 # Export to XML format
-pgexport -s "SELECT * FROM orders" -o orders.xml -f xml
+pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
 
 # Check version
-pgexport version
+pgxport version
 ```
 
 #### Using Connection String
 
 ```bash
 # Long form
-pgexport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
+pgxport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
          -s "SELECT * FROM users LIMIT 5" \
          -o users.csv
 
 # Short form
-pgexport -c "postgres://myuser:mypass@prod-server:5432/analytics" \
+pgxport -c "postgres://myuser:mypass@prod-server:5432/analytics" \
          -s "SELECT * FROM metrics WHERE date = CURRENT_DATE" \
          -o daily_metrics.csv
 
 # Override .env with different database
-pgexport -c "postgres://readonly:pass@replica:5432/mydb" \
+pgxport -c "postgres://readonly:pass@replica:5432/mydb" \
          -s "SELECT * FROM large_table" \
          -o export.csv
 ```
@@ -187,7 +187,7 @@ pgexport -c "postgres://readonly:pass@replica:5432/mydb" \
 
 ```bash
 # Complex query with joins
-pgexport -s "
+pgxport -s "
 SELECT 
   u.id, 
   u.username, 
@@ -201,11 +201,11 @@ ORDER BY total_revenue DESC
 " -o user_stats.csv -d ','
 
 # Export with timestamp in filename
-pgexport -s "SELECT * FROM logs WHERE created_at > NOW() - INTERVAL '24 hours'" \
+pgxport -s "SELECT * FROM logs WHERE created_at > NOW() - INTERVAL '24 hours'" \
          -o "logs_$(date +%Y%m%d).csv"
 
 # Using long-form flags
-pgexport --sql "SELECT * FROM stations ORDER BY name" \
+pgxport --sql "SELECT * FROM stations ORDER BY name" \
          --output stations.csv \
          --format csv \
          --delimiter ';'
@@ -216,11 +216,11 @@ pgexport --sql "SELECT * FROM stations ORDER BY name" \
 ```bash
 # Process multiple queries with a script
 for table in users orders products; do
-  pgexport -s "SELECT * FROM $table" -o "${table}_export.csv"
+  pgxport -s "SELECT * FROM $table" -o "${table}_export.csv"
 done
 
 # Export with error handling
-if pgexport -F complex_query.sql -o output.csv; then
+if pgxport -F complex_query.sql -o output.csv; then
   echo "Export successful!"
 else
   echo "Export failed!"
@@ -228,8 +228,8 @@ else
 fi
 
 # Connect to different environments
-pgexport -c "$DEV_DATABASE_URL" -s "SELECT * FROM users" -o dev_users.csv
-pgexport -c "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
+pgxport -c "$DEV_DATABASE_URL" -s "SELECT * FROM users" -o dev_users.csv
+pgxport -c "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
 ```
 
 ## 📊 Output Formats
@@ -306,7 +306,7 @@ id;name;email;created_at
 ## 🏗️ Project Structure
 
 ```
-pgexport/
+pgxport/
 ├── main.go           # CLI entry point and orchestration
 ├── config.go         # Configuration management with validation
 ├── store.go          # Database operations (connection, queries)
@@ -332,15 +332,15 @@ The project follows a clean architecture with separated concerns:
 
 ```bash
 # Build for current platform
-go build -o pgexport
+go build -o pgxport
 
 # Build with version information
-go build -ldflags="-X main.Version=1.0.0" -o pgexport
+go build -ldflags="-X main.Version=1.0.0" -o pgxport
 
 # Build for different platforms
-GOOS=linux GOARCH=amd64 go build -o pgexport-linux
-GOOS=darwin GOARCH=amd64 go build -o pgexport-macos
-GOOS=windows GOARCH=amd64 go build -o pgexport.exe
+GOOS=linux GOARCH=amd64 go build -o pgxport-linux
+GOOS=darwin GOARCH=amd64 go build -o pgxport-macos
+GOOS=windows GOARCH=amd64 go build -o pgxport.exe
 ```
 
 ### Dependencies
@@ -377,8 +377,8 @@ EOF
 3. Build and test:
 
 ```bash
-go build -o pgexport
-./pgexport -s "SELECT version()" -o version.csv
+go build -o pgxport
+./pgxport -s "SELECT version()" -o version.csv
 ```
 
 ## 🔒 Security Best Practices
@@ -389,9 +389,9 @@ go build -o pgexport
    - For production, use environment variables or secrets management
 
 2. **Avoid passwords in command line**:
-   - ❌ Bad: `pgexport --dsn "postgres://user:password123@host/db" ...` (visible in history)
+   - ❌ Bad: `pgxport --dsn "postgres://user:password123@host/db" ...` (visible in history)
    - ✅ Good: Use `.env` file or environment variables
-   - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgexport -c "$DATABASE_URL" ...`
+   - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgxport -c "$DATABASE_URL" ...`
 
 3. **Use parameterized queries**: When using dynamic SQL, be aware of SQL injection risks
 
@@ -454,8 +454,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter any issues or have questions:
 
-- 🐛 [Open an issue](https://github.com/fbz-tec/pgexport/issues) on GitHub
-- 💡 [Start a discussion](https://github.com/fbz-tec/pgexport/discussions) for feature requests
+- 🐛 [Open an issue](https://github.com/fbz-tec/pgxport/issues) on GitHub
+- 💡 [Start a discussion](https://github.com/fbz-tec/pgxport/discussions) for feature requests
 
 ## 🙏 Acknowledgments
 

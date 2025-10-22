@@ -4,8 +4,8 @@
 *.dll
 *.so
 *.dylib
-pgexport
-pgexport-*
+pgxport
+pgxport-*
 
 # Test binary, built with `go test -c`
 *.test

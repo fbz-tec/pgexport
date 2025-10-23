@@ -1,0 +1,125 @@
+version: '3'
+
+vars:
+  BINARY_NAME: pgxport
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  BUILD_TIME:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+  GIT_COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+  LDFLAGS: -ldflags "-X main.Version={{.VERSION}} -X main.BuildTime={{.BUILD_TIME}} -X main.GitCommit={{.GIT_COMMIT}}"
+
+tasks:
+  default:
+    desc: Build the project
+    cmds:
+      - task: build
+
+  # Build tasks
+  build:
+    desc: Build the binary
+    cmds:
+      - go build {{.LDFLAGS}} -o {{.BINARY_NAME}} .
+      - echo "✓ Build complete"
+
+  build-all:
+    desc: Build for all platforms
+    cmds:
+      - echo "Building for multiple platforms..."
+      - GOOS=linux GOARCH=amd64 go build {{.LDFLAGS}} -o dist/{{.BINARY_NAME}}-linux-amd64 .
+      - GOOS=linux GOARCH=arm64 go build {{.LDFLAGS}} -o dist/{{.BINARY_NAME}}-linux-arm64 .
+      - GOOS=darwin GOARCH=amd64 go build {{.LDFLAGS}} -o dist/{{.BINARY_NAME}}-darwin-amd64 .
+      - GOOS=darwin GOARCH=arm64 go build {{.LDFLAGS}} -o dist/{{.BINARY_NAME}}-darwin-arm64 .
+      - GOOS=windows GOARCH=amd64 go build {{.LDFLAGS}} -o dist/{{.BINARY_NAME}}-windows-amd64.exe .
+      - echo "✓ Multi-platform build complete in dist/"
+
+  release:
+    desc: Create release builds with checksums
+    cmds:
+      - rm -rf dist
+      - mkdir -p dist
+      - task: build-all
+      - cd dist && sha256sum * > checksums.txt
+      - echo "✓ Release builds ready in dist/ with checksums"
+
+  install:
+    desc: Install to GOPATH/bin
+    cmds:
+      - go install {{.LDFLAGS}} .
+      - echo "✓ Installed"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - go clean
+      - rm -f {{.BINARY_NAME}} {{.BINARY_NAME}}.exe
+      - rm -f coverage.txt coverage.html
+      - echo "✓ Cleaned"
+
+  # Test tasks
+  test:
+    desc: Run all tests
+    cmds:
+      - go test -v ./...
+
+  test-cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -v -coverprofile=coverage.txt ./...
+      - go tool cover -html=coverage.txt -o coverage.html
+      - go tool cover -func=coverage.txt
+      - 'echo "✓ Coverage report: coverage.html"'
+
+  test-short:
+    desc: Run quick tests only
+    cmds:
+      - go test -short ./...
+
+  # Code quality
+  fmt:
+    desc: Format code
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  check:
+    desc: Run fmt, vet and tests
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: test
+
+  # Development
+  run:
+    desc: Run the app (show version)
+    cmds:
+      - go run . version
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  # Docker
+  docker-up:
+    desc: Start PostgreSQL for tests
+    cmds:
+      - docker-compose up -d postgres
+      - echo "✓ Database started"
+
+  docker-down:
+    desc: Stop PostgreSQL
+    cmds:
+      - docker-compose down
+      - echo "✓ Database stopped"

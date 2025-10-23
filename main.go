@@ -32,7 +32,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
   pgxport -s "SELECT * FROM users" -o users.csv
 
   # Export from SQL file with custom delimiter
-  pgxport -F query.sql -o output.csv -d ","
+  pgxport -F query.sql -o output.csv -d ";"
 
   # Export to JSON
   pgxport -s "SELECT * FROM products" -o products.json -f json
@@ -58,7 +58,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json)")
-	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ";", "CSV delimiter character")
+	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
 	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 

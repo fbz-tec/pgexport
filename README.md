@@ -130,7 +130,7 @@ pgxport [command] [flags]
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
 | `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
-| `--delimiter` | `-d` | CSV delimiter character | `;` | No |
+| `--delimiter` | `-d` | CSV delimiter character | `,` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
 | `--dsn` | `-c` | Database connection string | - | No |
 | `--help` | `-h` | Show help message | - | No |
@@ -145,8 +145,8 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 # Simple query export (uses .env file)
 pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
-# Export with comma delimiter
-pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ','
+# Export with semicolon delimiter
+pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
 
 # Execute query from a SQL file
 pgxport -F queries/monthly_report.sql -o report.csv
@@ -242,7 +242,7 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
 ### CSV
 
-- **Default delimiter**: `;` (semicolon)
+- **Default delimiter**: `,` (comma)
 - Headers included automatically
 - Timestamps formatted as `2006-01-02T15:04:05.000`
 - NULL values exported as empty strings

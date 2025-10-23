@@ -508,9 +508,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Progress bar for long-running queries
 - [ ] Multiple database support (MySQL, SQLite, SQL Server)
 - [ ] Query result preview before export
-- [ ] Streaming mode for huge datasets
+- [x] ~~Streaming mode for huge datasets~~ ✅ Implemented!
 - [ ] Compression support (gzip, zip)
-- [ ] SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`
+- [x] ~~SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`~~ ✅ Implemented!
 - [ ] Batch INSERT statements for better performance
 
 ## 💬 Support

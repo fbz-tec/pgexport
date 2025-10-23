@@ -344,6 +344,8 @@ func formatValue(v interface{}) interface{} {
 		return val.Format("2006-01-02T15:04:05.000")
 	case []byte:
 		return string(val)
+	case float32, float64:
+		return fmt.Sprintf("%.15g", val)
 	default:
 		return v
 	}
@@ -369,9 +371,9 @@ func formatSQLValue(v interface{}) string {
 		}
 		return "false"
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%v", val)
+		return fmt.Sprintf("%d", val)
 	case float32, float64:
-		return fmt.Sprintf("%v", val)
+		return fmt.Sprintf("%.15g", val)
 	default:
 		str := fmt.Sprintf("%v", val)
 		escaped := strings.ReplaceAll(str, "'", "''")

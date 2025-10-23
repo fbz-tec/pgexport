@@ -9,20 +9,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type QueryResult struct {
-	Columns []string
-	Rows    [][]interface{}
-}
-
 type Store interface {
 	Open(dbUrl string) error
 	Close() error
-	ExecuteQuery(query string) (*QueryResult, error)
+	ExecuteQuery(ctx context.Context, sql string) (pgx.Rows, error)
 }
 
 type dbStore struct {
 	conn *pgx.Conn
-	ctx  context.Context
 }
 
 func NewStore() Store {
@@ -30,82 +24,47 @@ func NewStore() Store {
 }
 
 func (store *dbStore) Open(dbUrl string) error {
-	store.ctx = context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	config, err := pgx.ParseConfig(dbUrl)
-
-	if err != nil {
-		return fmt.Errorf("unable to parse config: %w", err)
-	}
-
-	config.ConnectTimeout = 10 * time.Second
-
-	conn, err := pgx.ConnectConfig(store.ctx, config)
+	conn, err := pgx.Connect(ctx, dbUrl)
 
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
 	// Ping the database to verify the connection
-	if err := conn.Ping(store.ctx); err != nil {
-		conn.Close(store.ctx)
+	if err := conn.Ping(ctx); err != nil {
+		conn.Close(ctx)
 		return fmt.Errorf("unable to ping database: %w", err)
 	}
 
-	log.Println("Connected to DB ...")
+	log.Println("Database connection established")
 	store.conn = conn
 	return nil
 }
 
 func (store *dbStore) Close() error {
-	log.Println("Close database connexion ...")
+	log.Println("Closing database connexion ...")
 
 	if store.conn != nil {
-		return store.conn.Close(store.ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return store.conn.Close(ctx)
 	}
 	return nil
 }
 
-func (store *dbStore) ExecuteQuery(query string) (*QueryResult, error) {
+func (store *dbStore) ExecuteQuery(ctx context.Context, sql string) (pgx.Rows, error) {
 
 	if store.conn == nil {
 		return nil, fmt.Errorf("no connection to database")
 	}
 
-	rows, err := store.conn.Query(store.ctx, query)
-
+	rows, err := store.conn.Query(ctx, sql)
 	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
+		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
 
-	defer rows.Close()
-
-	fieldDescriptions := rows.FieldDescriptions()
-	if len(fieldDescriptions) == 0 {
-		return nil, fmt.Errorf("no columns found in query result")
-	}
-
-	columns := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
-		columns[i] = string(fd.Name)
-	}
-
-	// Fetch all rows
-	var data [][]interface{}
-	for rows.Next() {
-		values, err := rows.Values()
-		if err != nil {
-			return nil, fmt.Errorf("error reading row %d: %w", len(data)+1, err)
-		}
-		data = append(data, values)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
-	}
-
-	return &QueryResult{
-		Columns: columns,
-		Rows:    data,
-	}, nil
+	return rows, nil
 }

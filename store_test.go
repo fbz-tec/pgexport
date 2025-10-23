@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"os"
 	"testing"
 )
 
@@ -92,7 +94,7 @@ func TestExecuteQueryWithoutConnection(t *testing.T) {
 	store := NewStore()
 
 	// Should return error, not panic
-	result, err := store.ExecuteQuery("SELECT 1")
+	result, err := store.ExecuteQuery(context.Background(), "SELECT 1")
 
 	if err == nil {
 		t.Error("ExecuteQuery() without connection should return error")
@@ -160,7 +162,7 @@ func TestExecuteQueryIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := store.ExecuteQuery(tt.query)
+			result, err := store.ExecuteQuery(context.Background(), tt.query)
 
 			if tt.wantErr {
 				if err == nil {
@@ -178,19 +180,24 @@ func TestExecuteQueryIntegration(t *testing.T) {
 			}
 
 			// Check columns
-			if len(result.Columns) != len(tt.expectedCols) {
-				t.Errorf("Column count = %d, want %d", len(result.Columns), len(tt.expectedCols))
+			fieldDescs := result.FieldDescriptions()
+			if len(fieldDescs) != len(tt.expectedCols) {
+				t.Errorf("Column count = %d, want %d", len(fieldDescs), len(tt.expectedCols))
 			}
 
 			for i, col := range tt.expectedCols {
-				if i < len(result.Columns) && result.Columns[i] != col {
-					t.Errorf("Column[%d] = %q, want %q", i, result.Columns[i], col)
+				if i < len(fieldDescs) && string(fieldDescs[i].Name) != col {
+					t.Errorf("Column[%d] = %q, want %q", i, string(fieldDescs[i].Name), col)
 				}
 			}
 
 			// Check row count
-			if len(result.Rows) != tt.expectedRows {
-				t.Errorf("Row count = %d, want %d", len(result.Rows), tt.expectedRows)
+			rowCount := 0
+			for result.Next() {
+				rowCount++
+			}
+			if rowCount != tt.expectedRows {
+				t.Errorf("Row count = %d, want %d", rowCount, tt.expectedRows)
 			}
 		})
 	}
@@ -209,7 +216,7 @@ func TestExecuteQueryEmptyResult(t *testing.T) {
 	defer store.Close()
 
 	// Query that returns no rows
-	result, err := store.ExecuteQuery("SELECT 1 as num WHERE 1=0")
+	result, err := store.ExecuteQuery(context.Background(), "SELECT 1 as num WHERE 1=0")
 	if err != nil {
 		t.Fatalf("ExecuteQuery() unexpected error: %v", err)
 	}
@@ -218,12 +225,19 @@ func TestExecuteQueryEmptyResult(t *testing.T) {
 		t.Fatal("ExecuteQuery() returned nil result")
 	}
 
-	if len(result.Columns) != 1 {
-		t.Errorf("Expected 1 column, got %d", len(result.Columns))
+	// Check columns
+	fieldDescs := result.FieldDescriptions()
+	if len(fieldDescs) != 1 {
+		t.Errorf("Expected 1 column, got %d", len(fieldDescs))
 	}
 
-	if len(result.Rows) != 0 {
-		t.Errorf("Expected 0 rows, got %d", len(result.Rows))
+	// Check rows
+	rowCount := 0
+	for result.Next() {
+		rowCount++
+	}
+	if rowCount != 0 {
+		t.Errorf("Expected 0 rows, got %d", rowCount)
 	}
 }
 
@@ -249,29 +263,40 @@ func TestExecuteQueryDataTypes(t *testing.T) {
 			NOW() as timestamp_col
 	`
 
-	result, err := store.ExecuteQuery(query)
+	result, err := store.ExecuteQuery(context.Background(), query)
 	if err != nil {
 		t.Fatalf("ExecuteQuery() error: %v", err)
 	}
 
 	expectedCols := []string{"int_col", "text_col", "bool_col", "numeric_col", "null_col", "timestamp_col"}
-	if len(result.Columns) != len(expectedCols) {
-		t.Errorf("Column count = %d, want %d", len(result.Columns), len(expectedCols))
-	}
-
-	if len(result.Rows) != 1 {
-		t.Fatalf("Expected 1 row, got %d", len(result.Rows))
+	fieldDescs := result.FieldDescriptions()
+	if len(fieldDescs) != len(expectedCols) {
+		t.Errorf("Column count = %d, want %d", len(fieldDescs), len(expectedCols))
 	}
 
 	// Verify we got the row with correct number of values
-	row := result.Rows[0]
-	if len(row) != len(expectedCols) {
-		t.Errorf("Row value count = %d, want %d", len(row), len(expectedCols))
+	rowCount := 0
+	var rowValues []interface{}
+	for result.Next() {
+		values, err := result.Values()
+		if err != nil {
+			t.Fatalf("Failed to get values: %v", err)
+		}
+		rowValues = values
+		rowCount++
+	}
+
+	if rowCount != 1 {
+		t.Fatalf("Expected 1 row, got %d", rowCount)
+	}
+
+	if len(rowValues) != len(expectedCols) {
+		t.Errorf("Row value count = %d, want %d", len(rowValues), len(expectedCols))
 	}
 
 	// Check that null value is actually nil
-	if row[4] != nil {
-		t.Errorf("null_col should be nil, got %v", row[4])
+	if rowValues[4] != nil {
+		t.Errorf("null_col should be nil, got %v", rowValues[4])
 	}
 }
 
@@ -296,7 +321,7 @@ func TestMultipleQueries(t *testing.T) {
 
 	for i, query := range queries {
 		t.Run(query, func(t *testing.T) {
-			result, err := store.ExecuteQuery(query)
+			result, err := store.ExecuteQuery(context.Background(), query)
 			if err != nil {
 				t.Errorf("Query %d failed: %v", i, err)
 				return
@@ -307,8 +332,12 @@ func TestMultipleQueries(t *testing.T) {
 				return
 			}
 
-			if len(result.Rows) != 1 {
-				t.Errorf("Query %d: expected 1 row, got %d", i, len(result.Rows))
+			rowCount := 0
+			for result.Next() {
+				rowCount++
+			}
+			if rowCount != 1 {
+				t.Errorf("Query %d: expected 1 row, got %d", i, rowCount)
 			}
 		})
 	}
@@ -328,7 +357,7 @@ func TestConnectionReuse(t *testing.T) {
 
 	// Execute same query multiple times to verify connection reuse
 	for i := 0; i < 5; i++ {
-		result, err := store.ExecuteQuery("SELECT 1")
+		result, err := store.ExecuteQuery(context.Background(), "SELECT 1")
 		if err != nil {
 			t.Errorf("Query %d failed: %v", i+1, err)
 		}
@@ -343,8 +372,5 @@ func TestConnectionReuse(t *testing.T) {
 // Example: export DB_TEST_URL="postgres://user:pass@localhost:5432/testdb"
 func getTestDatabaseURL() string {
 	// Check for test-specific database URL
-	return "" // Return empty by default - tests will be skipped
-
-	// To enable integration tests, uncomment the line below and set DB_TEST_URL
-	// return os.Getenv("DB_TEST_URL")
+	return os.Getenv("DB_TEST_URL")
 }

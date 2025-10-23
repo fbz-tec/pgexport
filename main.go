@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -57,7 +58,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.Flags().StringVarP(&sqlQuery, "sql", "s", "", "SQL query to execute")
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
-	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json)")
+	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
 	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
 	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
@@ -111,15 +112,17 @@ func runExport(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	//close connexion
+	//Close connexion
 	defer store.Close()
 
 	log.Println("Executing query...")
-	result, err := store.ExecuteQuery(query)
+	rows, err := store.ExecuteQuery(context.Background(), query)
 
 	if err != nil {
 		log.Fatalf("Query execution failed: %v", err)
 	}
+
+	defer rows.Close()
 
 	format = strings.ToLower(strings.TrimSpace(format))
 
@@ -131,7 +134,7 @@ func runExport(cmd *cobra.Command, args []string) {
 		TableName: tableName,
 	}
 
-	if err := exporter.Export(result, outputPath, options); err != nil {
+	if err := exporter.Export(rows, outputPath, options); err != nil {
 		log.Fatalf("Export failed: %v", err)
 	}
 

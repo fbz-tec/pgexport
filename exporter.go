@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -21,7 +23,7 @@ const (
 
 // Exporter interface defines export operations
 type Exporter interface {
-	Export(result *QueryResult, outputPath string, options ExportOptions) error
+	Export(rows pgx.Rows, outputPath string, options ExportOptions) error
 }
 
 // ExportOptions holds export configuration
@@ -40,19 +42,22 @@ func NewExporter() Exporter {
 }
 
 // Export exports query results to the specified format
-func (e *dataExporter) Export(result *QueryResult, outputPath string, options ExportOptions) error {
+func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOptions) error {
+
+	defer rows.Close()
+
 	var rowCount int
 	var err error
 
 	switch options.Format {
 	case FormatCSV:
-		rowCount, err = e.writeCSV(result, outputPath, options.Delimiter)
+		rowCount, err = e.writeCSV(rows, outputPath, options.Delimiter)
 	case FormatJSON:
-		rowCount, err = e.writeJSON(result, outputPath)
+		rowCount, err = e.writeJSON(rows, outputPath)
 	case FormatXML:
-		rowCount, err = e.writeXML(result, outputPath)
+		rowCount, err = e.writeXML(rows, outputPath)
 	case FormatSQL:
-		rowCount, err = e.writeSQL(result, outputPath, options.TableName)
+		rowCount, err = e.writeSQL(rows, outputPath, options.TableName)
 	default:
 		return fmt.Errorf("unsupported format: %s", options.Format)
 	}
@@ -66,7 +71,7 @@ func (e *dataExporter) Export(result *QueryResult, outputPath string, options Ex
 }
 
 // exportToCSV writes query results to a CSV file with buffered I/O
-func (e *dataExporter) writeCSV(result *QueryResult, csvPath string, delimiter rune) (int, error) {
+func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, delimiter rune) (int, error) {
 	file, err := os.Create(csvPath)
 	if err != nil {
 		return 0, fmt.Errorf("error creating file: %w", err)
@@ -82,27 +87,46 @@ func (e *dataExporter) writeCSV(result *QueryResult, csvPath string, delimiter r
 	defer writer.Flush()
 
 	// Write headers
-	if err := writer.Write(result.Columns); err != nil {
+	fieldDescriptions := rows.FieldDescriptions()
+	headers := make([]string, len(fieldDescriptions))
+	for i, fd := range fieldDescriptions {
+		headers[i] = string(fd.Name)
+	}
+
+	if err := writer.Write(headers); err != nil {
 		return 0, fmt.Errorf("error writing headers: %w", err)
 	}
 
 	// Write data rows
-	for i, row := range result.Rows {
-		record := make([]string, len(row))
-		for j, v := range row {
-			record[j] = toString(v)
+	rowCount := 0
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return rowCount, fmt.Errorf("error reading row: %w", err)
 		}
+		//format values to strings
+		record := make([]string, len(values))
+		for i, v := range values {
+			record[i] = toString(v)
+		}
+
+		rowCount++
 
 		if err := writer.Write(record); err != nil {
-			return i, fmt.Errorf("error writing row %d: %w", i+1, err)
+			return 0, fmt.Errorf("error writing row %d: %w", rowCount, err)
 		}
+
+		if rowCount%10000 == 0 {
+			writer.Flush()
+		}
+
 	}
 
-	return len(result.Rows), nil
+	return rowCount, nil
 }
 
 // exportToJSON writes query results to a JSON file with buffered I/O
-func (e *dataExporter) writeJSON(result *QueryResult, jsonPath string) (int, error) {
+func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string) (int, error) {
 	file, err := os.Create(jsonPath)
 	if err != nil {
 		return 0, fmt.Errorf("error creating file: %w", err)
@@ -113,31 +137,57 @@ func (e *dataExporter) writeJSON(result *QueryResult, jsonPath string) (int, err
 	bufferedWriter := bufio.NewWriter(file)
 	defer bufferedWriter.Flush()
 
-	// Convert rows to array of maps
-	var results []map[string]interface{}
-	for _, row := range result.Rows {
-		entry := make(map[string]interface{})
-		for i, col := range result.Columns {
-			entry[col] = formatValue(row[i])
-		}
-		results = append(results, entry)
-	}
-
 	// Encode to JSON with indentation
 	encoder := json.NewEncoder(bufferedWriter)
+	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
 
-	if err := encoder.Encode(results); err != nil {
-		return len(results), fmt.Errorf("error encoding JSON: %w", err)
+	// Get object keys names
+	fieldDescriptions := rows.FieldDescriptions()
+	keys := make([]string, len(fieldDescriptions))
+	for i, fd := range fieldDescriptions {
+		keys[i] = string(fd.Name)
 	}
 
-	return len(results), nil
-}
+	if _, err := bufferedWriter.WriteString("[\n"); err != nil {
+		return 0, fmt.Errorf("error writing start of JSON array: %w", err)
+	}
 
-// XMLResults represents the XML root structure
-type XMLResults struct {
-	XMLName xml.Name `xml:"results"`
-	Rows    []XMLRow `xml:"row"`
+	rowCount := 0
+
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return 0, fmt.Errorf("error reading row: %w", err)
+		}
+
+		//Convert row to map
+		entry := make(map[string]interface{}, len(keys))
+		for i, key := range keys {
+			entry[key] = formatValue(values[i])
+		}
+		rowCount++
+
+		if rowCount > 1 {
+			if _, err := bufferedWriter.WriteString(",\n"); err != nil {
+				return 0, fmt.Errorf("error writing comma for row %d: %w", rowCount, err)
+			}
+		}
+
+		if err := encoder.Encode(entry); err != nil {
+			return 0, fmt.Errorf("error encoding JSON: %w", err)
+		}
+
+		if rowCount%10000 == 0 {
+			bufferedWriter.Flush()
+		}
+	}
+
+	if _, err := bufferedWriter.WriteString("]\n"); err != nil {
+		return 0, fmt.Errorf("error writing end of JSON array: %w", err)
+	}
+
+	return rowCount, nil
 }
 
 // XMLRow represents a single row with dynamic fields
@@ -147,6 +197,8 @@ type XMLRow struct {
 
 // MarshalXML implements custom XML marshaling for XMLRow
 func (r XMLRow) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+
+	start.Name.Local = "row"
 	// Start the row element
 	if err := e.EncodeToken(start); err != nil {
 		return err
@@ -165,7 +217,7 @@ func (r XMLRow) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 }
 
 // exportToXML writes query results to an XML file with buffered I/O
-func (e *dataExporter) writeXML(result *QueryResult, xmlPath string) (int, error) {
+func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string) (int, error) {
 	file, err := os.Create(xmlPath)
 	if err != nil {
 		return 0, fmt.Errorf("error creating file: %w", err)
@@ -176,45 +228,64 @@ func (e *dataExporter) writeXML(result *QueryResult, xmlPath string) (int, error
 	bufferedWriter := bufio.NewWriter(file)
 	defer bufferedWriter.Flush()
 
+	// Encode to XML with indentation
+	encoder := xml.NewEncoder(bufferedWriter)
+	encoder.Indent("", "  ")
+
 	// Write XML header
 	if _, err := bufferedWriter.WriteString(xml.Header); err != nil {
 		return 0, fmt.Errorf("error writing XML header: %w", err)
 	}
 
-	// Build XML structure
-	xmlResults := XMLResults{
-		Rows: make([]XMLRow, 0, len(result.Rows)),
+	startResults := xml.StartElement{Name: xml.Name{Local: "results"}}
+	if err := encoder.EncodeToken(startResults); err != nil {
+		return 0, fmt.Errorf("error starting <results>: %w", err)
 	}
 
-	for _, row := range result.Rows {
+	// get fields names
+	fieldDescriptions := rows.FieldDescriptions()
+	fields := make([]string, len(fieldDescriptions))
+	for i, fd := range fieldDescriptions {
+		fields[i] = string(fd.Name)
+	}
+
+	rowCount := 0
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return 0, fmt.Errorf("error reading row: %w", err)
+		}
 		xmlRow := XMLRow{
 			Fields: make(map[string]string),
 		}
-
-		for i, col := range result.Columns {
-			xmlRow.Fields[col] = toString(row[i])
+		for i, field := range fields {
+			xmlRow.Fields[field] = toString(values[i])
 		}
 
-		xmlResults.Rows = append(xmlResults.Rows, xmlRow)
+		rowCount++
+
+		if err := encoder.Encode(xmlRow); err != nil {
+			return 0, fmt.Errorf("error encoding XML: %w", err)
+		}
+		if rowCount%10000 == 0 {
+			bufferedWriter.Flush()
+		}
+
 	}
 
-	// Encode to XML with indentation
-	encoder := xml.NewEncoder(bufferedWriter)
-	encoder.Indent("", "  ")
-
-	if err := encoder.Encode(xmlResults); err != nil {
-		return len(xmlResults.Rows), fmt.Errorf("error encoding XML: %w", err)
+	if err := encoder.EncodeToken(xml.EndElement{Name: startResults.Name}); err != nil {
+		return 0, fmt.Errorf("error ending </results>: %w", err)
 	}
 
 	// Add final newline
 	if _, err := bufferedWriter.WriteString("\n"); err != nil {
-		return len(xmlResults.Rows), fmt.Errorf("error writing final newline: %w", err)
+		return 0, fmt.Errorf("error writing final newline: %w", err)
 	}
 
-	return len(xmlResults.Rows), nil
+	return rowCount, nil
 }
 
-func (e *dataExporter) writeSQL(result *QueryResult, sqlPath string, tableName string) (int, error) {
+func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, tableName string) (int, error) {
 	file, err := os.Create(sqlPath)
 	if err != nil {
 		return 0, fmt.Errorf("error creating file: %w", err)
@@ -225,23 +296,36 @@ func (e *dataExporter) writeSQL(result *QueryResult, sqlPath string, tableName s
 	bufferedWriter := bufio.NewWriter(file)
 	defer bufferedWriter.Flush()
 
-	for i, row := range result.Rows {
-		record := make([]string, len(row))
+	rowCount := 0
 
-		//format values
-		for j, val := range row {
-			record[j] = formatSQLValue(val)
+	size := len(rows.FieldDescriptions())
+
+	for rows.Next() {
+		record := make([]string, size)
+
+		values, err := rows.Values()
+		if err != nil {
+			return 0, fmt.Errorf("error reading row: %w", err)
 		}
 
+		//format values
+		for i, val := range values {
+			record[i] = formatSQLValue(val)
+		}
+
+		rowCount++
 		//Create insert line with values
 		line := fmt.Sprintf("INSERT INTO %s VALUES (%s);\n", tableName, strings.Join(record, ", "))
 
 		if _, err := bufferedWriter.WriteString(line); err != nil {
-			return i, fmt.Errorf("error writing row %d: %w", i+1, err)
+			return 0, fmt.Errorf("error writing row %d: %w", rowCount, err)
+		}
+
+		if rowCount%10000 == 0 {
+			bufferedWriter.Flush()
 		}
 	}
-
-	return len(result.Rows), nil
+	return rowCount, nil
 }
 
 // formatValue formats a value for export (unified function)

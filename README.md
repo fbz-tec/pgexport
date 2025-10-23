@@ -1,18 +1,18 @@
 # pgxport
 
-A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV,XML,JSON ..).
+A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON, SQL).
 
 ## ✨ Features
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to CSV, JSON, and XML formats
+- 📊 Export to CSV, JSON, XML, and SQL formats
 - 🔧 Customizable CSV delimiter
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 Direct connection string support with `--dsn` flag
 - 🛡️ Robust error handling and validation
 - ⚡ Optimized for performance with buffered I/O
-- 🏗️ Clean architecture with separated concerns
+- 🗃️ Clean architecture with separated concerns
 - 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
 
 ## 📦 Installation
@@ -24,10 +24,6 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 ### Build from source
 
-# Export same data in different formats
-pgxport -s "SELECT * FROM products" -o products.csv -f csv
-pgxport -s "SELECT * FROM products" -o products.json -f json
-pgxport -s "SELECT * FROM products" -o products.xml -f xml
 ```bash
 # Clone the repository
 git clone https://github.com/fbz-tec/pgxport.git
@@ -133,8 +129,9 @@ pgxport [command] [flags]
 | `--sql` | `-s` | SQL query to execute | - | * |
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
-| `--format` | `-f` | Output format (csv, json, xml) | `csv` | No |
+| `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
 | `--delimiter` | `-d` | CSV delimiter character | `;` | No |
+| `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
 | `--dsn` | `-c` | Database connection string | - | No |
 | `--help` | `-h` | Show help message | - | No |
 
@@ -159,6 +156,9 @@ pgxport -s "SELECT * FROM products" -o products.json -f json
 
 # Export to XML format
 pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
+
+# Export to SQL INSERT statements
+pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
 # Check version
 pgxport version
@@ -230,6 +230,12 @@ fi
 # Connect to different environments
 pgxport -c "$DEV_DATABASE_URL" -s "SELECT * FROM users" -o dev_users.csv
 pgxport -c "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
+
+# Export same data in different formats
+pgxport -s "SELECT * FROM products" -o products.csv -f csv
+pgxport -s "SELECT * FROM products" -o products.json -f json
+pgxport -s "SELECT * FROM products" -o products.xml -f xml
+pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 ```
 
 ## 📊 Output Formats
@@ -303,14 +309,47 @@ id;name;email;created_at
 </results>
 ```
 
-## 🏗️ Project Structure
+### SQL
+
+- INSERT statements format for easy data migration
+- Buffered I/O for optimal performance
+- **Requires `--table` / `-t` parameter to specify target table name**
+
+**Example output:**
+```sql
+INSERT INTO users VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
+INSERT INTO users VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
+INSERT INTO users VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
+```
+
+**Usage example:**
+```bash
+# Export to SQL INSERT statements
+pgxport -s "SELECT * FROM users WHERE active = true" -o users.sql -f sql -t users_backup
+
+# Export from file to SQL
+pgxport -F query.sql -o output.sql -f sql --table target_table
+
+# Complex data types (numbers, booleans, NULL, dates)
+pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
+        -o products.sql -f sql -t products_backup
+```
+
+**SQL Format Features:**
+- ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL, bytea
+- ✅ **Automatic escaping**: Single quotes in strings are properly escaped (e.g., `O'Brien` → `'O''Brien'`)
+- ✅ **Type-aware formatting**: Numbers and booleans without quotes, strings and dates with quotes
+- ✅ **NULL handling**: NULL values exported as SQL `NULL` keyword
+- ✅ **Ready to import**: Generated SQL can be directly executed on any PostgreSQL database
+
+## 🗃️ Project Structure
 
 ```
 pgxport/
 ├── main.go           # CLI entry point and orchestration
 ├── config.go         # Configuration management with validation
 ├── store.go          # Database operations (connection, queries)
-├── exporter.go       # Export operations (CSV, JSON formatting)
+├── exporter.go       # Export operations (CSV, JSON, XML, SQL formatting)
 ├── version.go        # Version information
 ├── go.mod            # Go module definition
 ├── go.sum            # Go module checksums
@@ -323,7 +362,7 @@ The project follows a clean architecture with separated concerns:
 
 - **`store.go`**: Handles all database operations (connect, query, return results)
 - **`exporter.go`**: Handles all export operations (format data, write files)
-- **`main.go`**: Orchestrates the flow between store and exporter
+- **`main.go`**: Orchestrates the flow between store and exporter with validation
 - **`config.go`**: Manages configuration with validation, defaults, and `.env` file loading
 
 ## 🔧 Development
@@ -341,6 +380,22 @@ go build -ldflags="-X main.Version=1.0.0" -o pgxport
 GOOS=linux GOARCH=amd64 go build -o pgxport-linux
 GOOS=darwin GOARCH=amd64 go build -o pgxport-macos
 GOOS=windows GOARCH=amd64 go build -o pgxport.exe
+```
+
+### Testing
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run specific test
+go test -run TestValidateExportParams
 ```
 
 ### Dependencies
@@ -409,10 +464,14 @@ The tool provides clear error messages for common issues:
 - **SQL errors**: Verify your query syntax
 - **File errors**: Ensure write permissions for output directory
 - **Configuration errors**: Validate all required environment variables
+- **Format errors**: Ensure format is one of: csv, json, xml, sql
+- **SQL format errors**: Ensure `--table` flag is provided when using SQL format
 
 Example error output:
 ```
-2024/01/15 10:30:00 Configuration error: DB_PORT must be a valid port number (1-65535)
+Error: Invalid format 'txt'. Valid formats are: csv, json, xml, sql
+Error: --table (-t) is required when using SQL format
+Error: Configuration error: DB_PORT must be a valid port number (1-65535)
 ```
 
 ## 🤝 Contributing
@@ -431,8 +490,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - Add comments for exported functions
 - Keep functions small and focused
 - Separate concerns (database vs export logic)
+- Write tests for new features
 
-## 📝 License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -441,6 +501,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~`.env` file support for easy configuration~~ ✅ Implemented!
 - [x] ~~Direct connection string support with `--dsn` flag~~ ✅ Implemented!
 - [x] ~~XML export format~~ ✅ Implemented!
+- [x] ~~SQL INSERT export format~~ ✅ Implemented!
 - [ ] Interactive password prompt (secure, no history)
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets
@@ -449,6 +510,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Query result preview before export
 - [ ] Streaming mode for huge datasets
 - [ ] Compression support (gzip, zip)
+- [ ] SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`
+- [ ] Batch INSERT statements for better performance
 
 ## 💬 Support
 

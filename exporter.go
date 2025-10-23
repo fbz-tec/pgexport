@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ const (
 	FormatCSV  = "csv"
 	FormatJSON = "json"
 	FormatXML  = "xml"
+	FormatSQL  = "sql"
 )
 
 // Exporter interface defines export operations
@@ -26,6 +28,7 @@ type Exporter interface {
 type ExportOptions struct {
 	Format    string
 	Delimiter rune
+	TableName string
 }
 
 // dataExporter implements Exporter interface
@@ -48,6 +51,8 @@ func (e *dataExporter) Export(result *QueryResult, outputPath string, options Ex
 		rowCount, err = e.writeJSON(result, outputPath)
 	case FormatXML:
 		rowCount, err = e.writeXML(result, outputPath)
+	case FormatSQL:
+		rowCount, err = e.writeSQL(result, outputPath, options.TableName)
 	default:
 		return fmt.Errorf("unsupported format: %s", options.Format)
 	}
@@ -209,6 +214,36 @@ func (e *dataExporter) writeXML(result *QueryResult, xmlPath string) (int, error
 	return len(xmlResults.Rows), nil
 }
 
+func (e *dataExporter) writeSQL(result *QueryResult, sqlPath string, tableName string) (int, error) {
+	file, err := os.Create(sqlPath)
+	if err != nil {
+		return 0, fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+
+	// Use buffered writer for better performance
+	bufferedWriter := bufio.NewWriter(file)
+	defer bufferedWriter.Flush()
+
+	for i, row := range result.Rows {
+		record := make([]string, len(row))
+
+		//format values
+		for j, val := range row {
+			record[j] = formatSQLValue(val)
+		}
+
+		//Create insert line with values
+		line := fmt.Sprintf("INSERT INTO %s VALUES (%s);\n", tableName, strings.Join(record, ", "))
+
+		if _, err := bufferedWriter.WriteString(line); err != nil {
+			return i, fmt.Errorf("error writing row %d: %w", i+1, err)
+		}
+	}
+
+	return len(result.Rows), nil
+}
+
 // formatValue formats a value for export (unified function)
 func formatValue(v interface{}) interface{} {
 	if v == nil {
@@ -222,6 +257,36 @@ func formatValue(v interface{}) interface{} {
 		return string(val)
 	default:
 		return v
+	}
+}
+
+func formatSQLValue(v interface{}) string {
+	if v == nil {
+		return "NULL"
+	}
+	switch val := v.(type) {
+	case string:
+		escaped := strings.ReplaceAll(val, "'", "''")
+		return fmt.Sprintf("'%s'", escaped)
+	case []byte:
+		str := string(val)
+		escaped := strings.ReplaceAll(str, "'", "''")
+		return fmt.Sprintf("'%s'", escaped)
+	case time.Time:
+		return fmt.Sprintf("'%s'", val.Format("2006-01-02T15:04:05.000"))
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%v", val)
+	case float32, float64:
+		return fmt.Sprintf("%v", val)
+	default:
+		str := fmt.Sprintf("%v", val)
+		escaped := strings.ReplaceAll(str, "'", "''")
+		return fmt.Sprintf("'%s'", escaped)
 	}
 }
 

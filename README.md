@@ -344,6 +344,7 @@ pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
 
 ## 🗃️ Project Structure
 
+```
 pgxport/
 ├── exporters/          # Modular export package
 │   ├── exporter.go     # Interface and factory
@@ -360,6 +361,7 @@ pgxport/
 ├── go.mod              # Go module definition
 ├── go.sum              # Go module checksums
 └── README.md           # Documentation
+```
 
 ### Architecture
 

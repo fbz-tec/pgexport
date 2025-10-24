@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/xml"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -36,15 +35,15 @@ func (r XMLRow) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 }
 
 // exportToXML writes query results to an XML file with buffered I/O
-func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, option ExportOptions) (int, error) {
-	file, err := os.Create(xmlPath)
+func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
+	writeCloser, err := createOutputWriter(xmlPath, options, FormatXML)
 	if err != nil {
-		return 0, fmt.Errorf("error creating file: %w", err)
+		return 0, err
 	}
-	defer file.Close()
+	defer writeCloser.Close()
 
 	// Use buffered writer for better performance
-	bufferedWriter := bufio.NewWriter(file)
+	bufferedWriter := bufio.NewWriter(writeCloser)
 	defer bufferedWriter.Flush()
 
 	// Encode to XML with indentation

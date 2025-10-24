@@ -4,21 +4,21 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 )
 
 // exportToJSON writes query results to a JSON file with buffered I/O
 func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportOptions) (int, error) {
-	file, err := os.Create(jsonPath)
+	writeCloser, err := createOutputWriter(jsonPath, options, FormatJSON)
 	if err != nil {
-		return 0, fmt.Errorf("error creating file: %w", err)
+		return 0, err
 	}
-	defer file.Close()
+
+	defer writeCloser.Close()
 
 	// Use buffered writer for better performance
-	bufferedWriter := bufio.NewWriter(file)
+	bufferedWriter := bufio.NewWriter(writeCloser)
 	defer bufferedWriter.Flush()
 
 	// Encode to JSON with indentation

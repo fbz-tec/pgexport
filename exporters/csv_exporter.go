@@ -4,21 +4,21 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 )
 
 // exportToCSV writes query results to a CSV file with buffered I/O
 func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOptions) (int, error) {
-	file, err := os.Create(csvPath)
+	writerCloser, err := createOutputWriter(csvPath, options, FormatCSV)
 	if err != nil {
-		return 0, fmt.Errorf("error creating file: %w", err)
+		return 0, err
 	}
-	defer file.Close()
+
+	defer writerCloser.Close()
 
 	// Use buffered writer for better performance
-	bufferedWriter := bufio.NewWriter(file)
+	bufferedWriter := bufio.NewWriter(writerCloser)
 	defer bufferedWriter.Flush()
 
 	writer := csv.NewWriter(bufferedWriter)

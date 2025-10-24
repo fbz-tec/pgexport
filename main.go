@@ -12,13 +12,14 @@ import (
 )
 
 var (
-	sqlQuery   string
-	sqlFile    string
-	outputPath string
-	format     string
-	delimiter  string
-	connString string
-	tableName  string
+	sqlQuery    string
+	sqlFile     string
+	outputPath  string
+	format      string
+	delimiter   string
+	connString  string
+	tableName   string
+	compression string
 )
 
 func main() {
@@ -63,6 +64,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
 	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
+	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
@@ -130,9 +132,10 @@ func runExport(cmd *cobra.Command, args []string) {
 	exporter := exporters.NewExporter()
 
 	options := exporters.ExportOptions{
-		Format:    format,
-		Delimiter: rune(delimiter[0]),
-		TableName: tableName,
+		Format:      format,
+		Delimiter:   rune(delimiter[0]),
+		TableName:   tableName,
+		Compression: compression,
 	}
 
 	if err := exporter.Export(rows, outputPath, options); err != nil {
@@ -166,6 +169,24 @@ func validateExportParams() error {
 	if !isValid {
 		return fmt.Errorf("Error: Invalid format '%s'. Valid formats are: %s",
 			format, strings.Join(validFormats, ", "))
+	}
+
+	compression = strings.ToLower(strings.TrimSpace(compression))
+	if compression == "" {
+		compression = "none"
+	}
+	validCompressions := []string{"none", "gzip", "zip"}
+	compressionValid := false
+	for _, c := range validCompressions {
+		if compression == c {
+			compressionValid = true
+			break
+		}
+	}
+
+	if !compressionValid {
+		return fmt.Errorf("Error: Invalid compression '%s'. Valid options are: %s",
+			compression, strings.Join(validCompressions, ", "))
 	}
 
 	// Validate table name for SQL format

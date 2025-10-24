@@ -21,9 +21,10 @@ type Exporter interface {
 
 // ExportOptions holds export configuration
 type ExportOptions struct {
-	Format    string
-	Delimiter rune
-	TableName string
+	Format      string
+	Delimiter   rune
+	TableName   string
+	Compression string
 }
 
 // dataExporter implements Exporter interface

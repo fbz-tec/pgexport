@@ -8,6 +8,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 📄 Run SQL queries from files
 - 📊 Export to CSV, JSON, XML, and SQL formats
 - 🔧 Customizable CSV delimiter
+- 🗜️ Optional gzip or zip compression for exported files
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 Direct connection string support with `--dsn` flag
 - 🛡️ Robust error handling and validation
@@ -132,6 +133,7 @@ pgxport [command] [flags]
 | `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
+| `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | `-c` | Database connection string | - | No |
 | `--help` | `-h` | Show help message | - | No |
 
@@ -159,6 +161,12 @@ pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
 
 # Export to SQL INSERT statements
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
+
+# Export with gzip compression
+pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
+
+# Export with zip compression (creates logs.zip containing logs.csv)
+pgxport -s "SELECT * FROM logs" -o logs.zip -f csv -z zip
 
 # Check version
 pgxport version
@@ -522,7 +530,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Multiple database support (MySQL, SQLite, SQL Server)
 - [ ] Query result preview before export
 - [x] ~~Streaming mode for huge datasets~~ ✅ Implemented!
-- [ ] Compression support (gzip, zip)
+- [x] ~~Compression support (gzip, zip)~~ ✅ Implemented!
 - [x] ~~SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`~~ ✅ Implemented!
 - [ ] Batch INSERT statements for better performance
 

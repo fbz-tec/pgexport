@@ -3,21 +3,20 @@ package exporters
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOptions) (int, error) {
-	file, err := os.Create(sqlPath)
+	writeCloser, err := createOutputWriter(sqlPath, options, FormatSQL)
 	if err != nil {
-		return 0, fmt.Errorf("error creating file: %w", err)
+		return 0, err
 	}
-	defer file.Close()
+	defer writeCloser.Close()
 
 	// Use buffered writer for better performance
-	bufferedWriter := bufio.NewWriter(file)
+	bufferedWriter := bufio.NewWriter(writeCloser)
 	defer bufferedWriter.Flush()
 
 	rowCount := 0

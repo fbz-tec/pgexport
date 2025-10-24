@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fbz-tec/pgexport/exporters"
 	"github.com/spf13/cobra"
 )
 
@@ -126,9 +127,9 @@ func runExport(cmd *cobra.Command, args []string) {
 
 	format = strings.ToLower(strings.TrimSpace(format))
 
-	exporter := NewExporter()
+	exporter := exporters.NewExporter()
 
-	options := ExportOptions{
+	options := exporters.ExportOptions{
 		Format:    format,
 		Delimiter: rune(delimiter[0]),
 		TableName: tableName,

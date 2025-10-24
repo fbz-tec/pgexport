@@ -344,28 +344,39 @@ pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
 
 ## 🗃️ Project Structure
 
-```
 pgxport/
-├── main.go           # CLI entry point and orchestration
-├── config.go         # Configuration management with validation
-├── store.go          # Database operations (connection, queries)
-├── exporter.go       # Export operations (CSV, JSON, XML, SQL formatting)
-├── version.go        # Version information
-├── go.mod            # Go module definition
-├── go.sum            # Go module checksums
-└── README.md         # Documentation
-```
+├── exporters/          # Modular export package
+│   ├── exporter.go     # Interface and factory
+│   ├── common.go       # Shared utilities
+│   ├── csv_exporter.go # CSV export implementation
+│   ├── json_exporter.go# JSON export implementation
+│   ├── xml_exporter.go # XML export implementation
+│   ├── sql_exporter.go # SQL export implementation
+│   └── README.md       # Package documentation
+├── main.go             # CLI entry point and orchestration
+├── config.go           # Configuration management with validation
+├── store.go            # Database operations (connection, queries)
+├── version.go          # Version information
+├── go.mod              # Go module definition
+├── go.sum              # Go module checksums
+└── README.md           # Documentation
 
 ### Architecture
 
-The project follows a clean architecture with separated concerns:
+The project follows a clean, modular architecture with separated concerns:
 
+- **`exporters/`**: Modular export package with Strategy pattern
+  - **`exporter.go`**: Defines the `Exporter` interface and factory
+  - **`common.go`**: Shared formatting utilities for all exporters
+  - **`csv_exporter.go`**: CSV export implementation
+  - **`json_exporter.go`**: JSON export implementation
+  - **`xml_exporter.go`**: XML export implementation
+  - **`sql_exporter.go`**: SQL INSERT export implementation
 - **`store.go`**: Handles all database operations (connect, query, return results)
-- **`exporter.go`**: Handles all export operations (format data, write files)
-- **`main.go`**: Orchestrates the flow between store and exporter with validation
+- **`main.go`**: Orchestrates the flow between store and exporters
 - **`config.go`**: Manages configuration with validation, defaults, and `.env` file loading
 
-## 🔧 Development
+Each exporter is isolated in its own file, making the codebase easy to maintain, test, and extend with new formats.
 
 ### Building
 

@@ -32,16 +32,22 @@ func (c *compositeWriteCloser) Close() error {
 func createOutputWriter(path string, options ExportOptions, format string) (io.WriteCloser, error) {
 	compression := strings.ToLower(strings.TrimSpace(options.Compression))
 
-	file, err := os.Create(path)
-	if err != nil {
-		return nil, fmt.Errorf("error creating file: %w", err)
-	}
-
 	switch compression {
 	case None:
+		file, err := os.Create(path)
+		if err != nil {
+			return nil, fmt.Errorf("error creating file: %w", err)
+		}
 		return file, nil
 
 	case GZIP:
+		if !strings.HasSuffix(strings.ToLower(path), ".gz") {
+			path += ".gz"
+		}
+		file, err := os.Create(path)
+		if err != nil {
+			return nil, fmt.Errorf("error creating file: %w", err)
+		}
 		gzipWriter := gzip.NewWriter(file)
 		return &compositeWriteCloser{
 			Writer: gzipWriter,
@@ -58,6 +64,13 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 		}, nil
 
 	case ZIP:
+		if !strings.HasSuffix(strings.ToLower(path), ".zip") {
+			path += ".zip"
+		}
+		file, err := os.Create(path)
+		if err != nil {
+			return nil, fmt.Errorf("error creating file: %w", err)
+		}
 		zipWriter := zip.NewWriter(file)
 		entryName := determineZipEntryName(path, format)
 		entryWriter, err := zipWriter.Create(entryName)
@@ -89,16 +102,13 @@ func determineZipEntryName(outputPath, format string) string {
 	base := filepath.Base(outputPath)
 	lowerBase := strings.ToLower(base)
 
-	if strings.HasSuffix(lowerBase, ".zip") {
-		base = base[:len(base)-len(".zip")]
-	}
+	name := strings.TrimSuffix(lowerBase, ".zip")
 
-	name := base
 	if name == "" {
 		name = "export"
 	}
 
-	if !strings.HasSuffix(strings.ToLower(name), "."+format) {
+	if !strings.HasSuffix(name, "."+format) {
 		name = fmt.Sprintf("%s.%s", name, format)
 	}
 

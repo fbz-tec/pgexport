@@ -91,6 +91,10 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 	}
 
+	if err := rows.Err(); err != nil {
+		return rowCount, fmt.Errorf("error iterating rows: %w", err)
+	}
+
 	if err := encoder.EncodeToken(xml.EndElement{Name: startResults.Name}); err != nil {
 		return 0, fmt.Errorf("error ending </results>: %w", err)
 	}

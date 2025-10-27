@@ -38,8 +38,6 @@ func NewExporter() Exporter {
 // Export exports query results to the specified format
 func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOptions) error {
 
-	defer rows.Close()
-
 	var rowCount int
 	var err error
 

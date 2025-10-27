@@ -115,7 +115,7 @@ func runExport(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	//Close connexion
+	//Close connection
 	defer store.Close()
 
 	log.Println("Executing query...")

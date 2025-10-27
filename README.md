@@ -356,6 +356,7 @@ pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
 pgxport/
 ├── exporters/          # Modular export package
 │   ├── exporter.go     # Interface and factory
+│   ├── compression.go  # Compression writers (gzip,zip)
 │   ├── common.go       # Shared utilities
 │   ├── csv_exporter.go # CSV export implementation
 │   ├── json_exporter.go# JSON export implementation
@@ -377,6 +378,7 @@ The project follows a clean, modular architecture with separated concerns:
 
 - **`exporters/`**: Modular export package with Strategy pattern
   - **`exporter.go`**: Defines the `Exporter` interface and factory
+  - **`compression.go`**: Handles output compression (gzip, zip)
   - **`common.go`**: Shared formatting utilities for all exporters
   - **`csv_exporter.go`**: CSV export implementation
   - **`json_exporter.go`**: JSON export implementation

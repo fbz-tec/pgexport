@@ -24,7 +24,7 @@ func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOpt
 	fields := rows.FieldDescriptions()
 	columns := make([]string, len(fields))
 	for i, fd := range fields {
-		columns[i] = string(fd.Name)
+		columns[i] = quoteIdent(fd.Name)
 	}
 	size := len(columns)
 
@@ -43,7 +43,7 @@ func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOpt
 
 		rowCount++
 		//Create insert line with values
-		line := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", options.TableName, strings.Join(columns, ", "), strings.Join(record, ", "))
+		line := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", quoteIdent(options.TableName), strings.Join(columns, ", "), strings.Join(record, ", "))
 
 		if _, err := bufferedWriter.WriteString(line); err != nil {
 			return 0, fmt.Errorf("error writing row %d: %w", rowCount, err)

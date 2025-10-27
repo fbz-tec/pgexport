@@ -325,9 +325,9 @@ id;name;email;created_at
 
 **Example output:**
 ```sql
-INSERT INTO users VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
-INSERT INTO users VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
-INSERT INTO users VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
 ```
 
 **Usage example:**

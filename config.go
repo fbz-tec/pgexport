@@ -17,7 +17,6 @@ const (
 	DefaultDBUser   = "postgres"
 	DefaultDBName   = "postgres"
 	DefaultDBDriver = "postgres"
-	DefaultSSLMode  = "disable"
 )
 
 type Config struct {
@@ -43,7 +42,7 @@ func LoadConfig() Config {
 		DBHost:   getEnvOrDefault("DB_HOST", DefaultDBHost),
 		DBPort:   getEnvOrDefault("DB_PORT", DefaultDBPort),
 		DBName:   getEnvOrDefault("DB_NAME", DefaultDBName),
-		SSLMode:  getEnvOrDefault("DB_SSLMODE", DefaultSSLMode),
+		SSLMode:  os.Getenv("DB_SSLMODE"),
 	}
 }
 
@@ -80,7 +79,9 @@ func (c Config) GetConnectionString() string {
 		Path:   c.DBName,
 	}
 	q := u.Query()
-	q.Set("sslmode", c.SSLMode)
+	if strings.TrimSpace(c.SSLMode) != "" {
+		q.Set("sslmode", c.SSLMode)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ const (
 	DefaultDBUser   = "postgres"
 	DefaultDBName   = "postgres"
 	DefaultDBDriver = "postgres"
+	DefaultSSLMode  = "disable"
 )
 
 type Config struct {
@@ -25,6 +27,7 @@ type Config struct {
 	DBHost   string
 	DBPort   string
 	DBName   string
+	SSLMode  string
 }
 
 func LoadConfig() Config {
@@ -40,6 +43,7 @@ func LoadConfig() Config {
 		DBHost:   getEnvOrDefault("DB_HOST", DefaultDBHost),
 		DBPort:   getEnvOrDefault("DB_PORT", DefaultDBPort),
 		DBName:   getEnvOrDefault("DB_NAME", DefaultDBName),
+		SSLMode:  getEnvOrDefault("DB_SSLMODE", DefaultSSLMode),
 	}
 }
 
@@ -69,8 +73,16 @@ func (c Config) Validate() error {
 }
 
 func (c Config) GetConnectionString() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
-		c.DBUser, c.DBPass, c.DBHost, c.DBPort, c.DBName)
+	u := &url.URL{
+		Scheme: c.DBDriver,
+		User:   url.UserPassword(c.DBUser, c.DBPass),
+		Host:   fmt.Sprintf("%s:%s", c.DBHost, c.DBPort),
+		Path:   c.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func getEnvOrDefault(key, defaultValue string) string {

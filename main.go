@@ -131,9 +131,14 @@ func runExport(cmd *cobra.Command, args []string) {
 
 	exporter := exporters.NewExporter()
 
+	delimRune, err := parseDelimiter(delimiter)
+	if err != nil {
+		log.Fatalf("Invalid delimiter: %v", err)
+	}
+
 	options := exporters.ExportOptions{
 		Format:      format,
-		Delimiter:   rune(delimiter[0]),
+		Delimiter:   delimRune,
 		TableName:   tableName,
 		Compression: compression,
 	}
@@ -203,4 +208,24 @@ func readSQLFromFile(filepath string) (string, error) {
 		return "", fmt.Errorf("unable to read file: %w", err)
 	}
 	return string(content), nil
+}
+
+func parseDelimiter(delim string) (rune, error) {
+	delim = strings.TrimSpace(delim)
+
+	if delim == "" {
+		return 0, fmt.Errorf("delimiter cannot be empty")
+	}
+
+	if delim == `\t` {
+		return '\t', nil
+	}
+
+	runes := []rune(delim)
+
+	if len(runes) != 1 {
+		return 0, fmt.Errorf("delimiter must be a single character (use \\t for tab)")
+	}
+
+	return runes[0], nil
 }

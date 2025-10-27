@@ -53,5 +53,10 @@ func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOpt
 			bufferedWriter.Flush()
 		}
 	}
+
+	if err := rows.Err(); err != nil {
+		return rowCount, fmt.Errorf("error iterating rows: %w", err)
+	}
+
 	return rowCount, nil
 }

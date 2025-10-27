@@ -67,6 +67,10 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return rowCount, fmt.Errorf("error iterating rows: %w", err)
+	}
+
 	if _, err := bufferedWriter.WriteString("]\n"); err != nil {
 		return 0, fmt.Errorf("error writing end of JSON array: %w", err)
 	}

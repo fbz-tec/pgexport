@@ -61,5 +61,9 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 
 	}
 
+	if err := rows.Err(); err != nil {
+		return rowCount, fmt.Errorf("error iterating rows: %w", err)
+	}
+
 	return rowCount, nil
 }

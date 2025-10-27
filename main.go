@@ -45,7 +45,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 
    # Export to SQL insert statements
   pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders_table`,
-		Run: runExport,
+		RunE: runExport,
 	}
 
 	// Version command
@@ -70,72 +70,63 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("Error: %v", err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(1)
 	}
 
 }
 
-func runExport(cmd *cobra.Command, args []string) {
-
+func runExport(cmd *cobra.Command, args []string) error {
 	if err := validateExportParams(); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	var dbUrl string
-
 	if connString != "" {
 		dbUrl = connString
 	} else {
 		config := LoadConfig()
-
 		if err := config.Validate(); err != nil {
-			log.Fatalf("Configuration error: %v", err)
+			return fmt.Errorf("configuration error: %w", err)
 		}
-
 		dbUrl = config.GetConnectionString()
-
 	}
 
 	var query string
 	var err error
-
 	if sqlFile != "" {
 		query, err = readSQLFromFile(sqlFile)
 		if err != nil {
-			log.Fatalf("Error reading SQL file: %v\n", err)
+			return fmt.Errorf("error reading SQL file: %w", err)
 		}
 	} else {
 		query = sqlQuery
 	}
 
-	store := NewStore()
+	format = strings.ToLower(strings.TrimSpace(format))
 
-	// connect to DB
-	if err := store.Open(dbUrl); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+	var delimRune rune = ','
+	if format == "csv" {
+		delimRune, err = parseDelimiter(delimiter)
+		if err != nil {
+			return fmt.Errorf("invalid delimiter: %w", err)
+		}
 	}
 
-	//Close connection
+	store := NewStore()
+	if err := store.Open(dbUrl); err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
 	defer store.Close()
 
 	log.Println("Executing query...")
 	rows, err := store.ExecuteQuery(context.Background(), query)
-
 	if err != nil {
-		log.Fatalf("Query execution failed: %v", err)
+		return fmt.Errorf("query execution failed: %w", err)
 	}
-
 	defer rows.Close()
 
-	format = strings.ToLower(strings.TrimSpace(format))
-
 	exporter := exporters.NewExporter()
-
-	delimRune, err := parseDelimiter(delimiter)
-	if err != nil {
-		log.Fatalf("Invalid delimiter: %v", err)
-	}
-
 	options := exporters.ExportOptions{
 		Format:      format,
 		Delimiter:   delimRune,
@@ -144,9 +135,10 @@ func runExport(cmd *cobra.Command, args []string) {
 	}
 
 	if err := exporter.Export(rows, outputPath, options); err != nil {
-		log.Fatalf("Export failed: %v", err)
+		return fmt.Errorf("export failed: %w", err)
 	}
 
+	return nil
 }
 
 func validateExportParams() error {

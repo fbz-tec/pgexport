@@ -54,6 +54,14 @@ func formatSQLValue(v interface{}) string {
 	}
 }
 
+func quoteIdent(s string) string {
+	parts := strings.Split(s, ".")
+	for i, part := range parts {
+		parts[i] = `"` + strings.ReplaceAll(part, `"`, `""`) + `"`
+	}
+	return strings.Join(parts, ".")
+}
+
 // toString converts any value to string for CSV export
 func toString(v interface{}) string {
 	formatted := formatValue(v)

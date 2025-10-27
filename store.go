@@ -45,7 +45,7 @@ func (store *dbStore) Open(dbUrl string) error {
 }
 
 func (store *dbStore) Close() error {
-	log.Println("Closing database connexion ...")
+	log.Println("Closing database connection ...")
 
 	if store.conn != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

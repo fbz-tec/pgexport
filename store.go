@@ -12,6 +12,7 @@ import (
 type Store interface {
 	Open(dbUrl string) error
 	Close() error
+	GetConnection() *pgx.Conn
 	ExecuteQuery(ctx context.Context, sql string) (pgx.Rows, error)
 }
 
@@ -67,4 +68,8 @@ func (store *dbStore) ExecuteQuery(ctx context.Context, sql string) (pgx.Rows, e
 	}
 
 	return rows, nil
+}
+
+func (store *dbStore) GetConnection() *pgx.Conn {
+	return store.conn
 }

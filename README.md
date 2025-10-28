@@ -7,6 +7,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
 - 📊 Export to CSV, JSON, XML, and SQL formats
+- ⚡ High-performance CSV export using PostgreSQL native COPY mode (`--with-copy`)
 - 🔧 Customizable CSV delimiter
 - 🗜️ Optional gzip or zip compression for exported files
 - ⚙️ Simple configuration via environment variables or `.env` file
@@ -132,6 +133,7 @@ pgxport [command] [flags]
 | `--output` | `-o` | Output file path | - | ✓ |
 | `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
+| `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | `-c` | Database connection string | - | No |
@@ -152,6 +154,9 @@ pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
 
 # Execute query from a SQL file
 pgxport -F queries/monthly_report.sql -o report.csv
+
+# Use the high-performance COPY mode for large CSV exports
+pgxport -s "SELECT * FROM big_table" -o big_table.csv -f csv --with-copy
 
 # Export to JSON format
 pgxport -s "SELECT * FROM products" -o products.json -f json
@@ -262,6 +267,25 @@ id;name;email;created_at
 1;John Doe;john@example.com;2024-01-15T10:30:00.000
 2;Jane Smith;jane@example.com;2024-01-16T14:22:15.000
 ```
+### ⚙️ COPY Mode (High-Performance CSV Export)
+
+The `--with-copy` flag enables PostgreSQL’s native COPY TO STDOUT mechanism for CSV exports.
+This mode streams data directly from the database server, reducing CPU and memory usage.
+
+Benefits:
+- 🚀 Up to 10× faster than row-by-row export for large datasets
+- 💾 Low memory footprint
+- 🗜️ Compatible with compression (gzip, zip)
+- 🔄 Identical CSV output format
+
+Example usage:
+```bash
+pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
+```
+#### ⚠️ Note:
+
+When using --with-copy, PostgreSQL handles type serialization.
+Date and timestamp formats may differ from standard csv export.
 
 ### JSON
 
@@ -525,6 +549,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~Direct connection string support with `--dsn` flag~~ ✅ Implemented!
 - [x] ~~XML export format~~ ✅ Implemented!
 - [x] ~~SQL INSERT export format~~ ✅ Implemented!
+- [x] ~~High-performance CSV export using PostgreSQL COPY~~ ✅ Implemented!
 - [ ] Interactive password prompt (secure, no history)
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets

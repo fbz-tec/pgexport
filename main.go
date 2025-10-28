@@ -28,14 +28,23 @@ func main() {
 
 	var rootCmd = &cobra.Command{
 		Use:   "pgxport",
-		Short: "Export PostgreSQL query results to various formats",
-		Long: `A powerful CLI tool to export PostgreSQL query results to CSV, JSON, XML, SQL(insert) and other formats.
-Supports direct SQL queries or SQL files, with customizable output options.`,
+		Short: "Export PostgreSQL query results to CSV, JSON, XML, or SQL formats",
+		Long: `A powerful CLI tool to export PostgreSQL query results.
+It supports direct SQL queries or SQL files, with customizable output options.
+		
+Supported output formats:
+ • CSV  — standard text export with customizable delimiter
+ • JSON — structured export for API or data processing
+ • XML  — hierarchical export for interoperability
+ • SQL  — generate INSERT statements`,
 		Example: `  # Export with inline query
   pgxport -s "SELECT * FROM users" -o users.csv
 
   # Export from SQL file with custom delimiter
   pgxport -F query.sql -o output.csv -d ";"
+
+  # Use the high-performance COPY mode for large CSV exports
+  pgxport -s "SELECT * FROM events" -o events.csv -f csv --with-copy
 
   # Export to JSON
   pgxport -s "SELECT * FROM products" -o products.json -f json
@@ -65,6 +74,7 @@ Supports direct SQL queries or SQL files, with customizable output options.`,
 	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
+	rootCmd.Flags().Bool("with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
@@ -94,6 +104,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 
 	var query string
 	var err error
+
 	if sqlFile != "" {
 		query, err = readSQLFromFile(sqlFile)
 		if err != nil {
@@ -119,7 +130,29 @@ func runExport(cmd *cobra.Command, args []string) error {
 	}
 	defer store.Close()
 
+	withCopy, _ := cmd.Flags().GetBool("with-copy")
+
+	options := exporters.ExportOptions{
+		Format:      format,
+		Delimiter:   delimRune,
+		TableName:   tableName,
+		Compression: compression,
+	}
+
 	log.Println("Executing query...")
+
+	if format == "csv" && withCopy {
+
+		log.Println("Using PostgreSQL native COPY mode for CSV export...")
+		exporter := exporters.NewCopyExporter()
+
+		if err := exporter.ExportCopy(store.GetConnection(), query, outputPath, options); err != nil {
+			return fmt.Errorf("error exporting to %s: %w", options.Format, err)
+		}
+
+		return nil
+	}
+
 	rows, err := store.ExecuteQuery(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("query execution failed: %w", err)
@@ -127,12 +160,6 @@ func runExport(cmd *cobra.Command, args []string) error {
 	defer rows.Close()
 
 	exporter := exporters.NewExporter()
-	options := exporters.ExportOptions{
-		Format:      format,
-		Delimiter:   delimRune,
-		TableName:   tableName,
-		Compression: compression,
-	}
 
 	if err := exporter.Export(rows, outputPath, options); err != nil {
 		return fmt.Errorf("export failed: %w", err)

@@ -2,6 +2,7 @@ package exporters
 
 import (
 	"bufio"
+	"context"
 	"encoding/csv"
 	"fmt"
 
@@ -66,4 +67,23 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 	}
 
 	return rowCount, nil
+}
+
+func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string, options ExportOptions) (int, error) {
+	writerCloser, err := createOutputWriter(csvPath, options, FormatCSV)
+	if err != nil {
+		return 0, err
+	}
+
+	defer writerCloser.Close()
+
+	copySql := fmt.Sprintf("COPY (%s) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER '%c')", query, options.Delimiter)
+
+	tag, err := conn.PgConn().CopyTo(context.Background(), writerCloser, copySql)
+	if err != nil {
+		return 0, fmt.Errorf("COPY TO STDOUT failed: %w", err)
+	}
+
+	return int(tag.RowsAffected()), nil
+
 }

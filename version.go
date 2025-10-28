@@ -14,11 +14,12 @@ var (
 
 // GetVersionInfo returns formatted version information
 func GetVersionInfo() string {
-	return fmt.Sprintf(`pgxport version %s
-  Build time: %s
-  Git commit: %s
-  Go version: %s
-  OS/Arch: %s/%s`,
+	return fmt.Sprintf(
+		`pgxport version %s
+Build time: %s
+Git commit: %s
+Go version: %s
+OS/Arch: %s/%s`,
 		Version,
 		BuildTime,
 		GitCommit,

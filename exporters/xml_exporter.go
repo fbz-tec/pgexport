@@ -8,31 +8,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// XMLRow represents a single row with dynamic fields
-type XMLRow struct {
-	Fields map[string]string
-}
-
-// MarshalXML implements custom XML marshaling for XMLRow
-func (r XMLRow) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-
-	start.Name.Local = "row"
-	// Start the row element
-	if err := e.EncodeToken(start); err != nil {
-		return err
-	}
-
-	// Encode each field as a separate XML element
-	for key, value := range r.Fields {
-		elem := xml.StartElement{Name: xml.Name{Local: key}}
-		if err := e.EncodeElement(value, elem); err != nil {
-			return err
-		}
-	}
-
-	// End the row element
-	return e.EncodeToken(xml.EndElement{Name: start.Name})
-}
+const (
+	XmlRootElement = "results"
+	XmlRowElement  = "row"
+)
 
 // exportToXML writes query results to an XML file with buffered I/O
 func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
@@ -55,9 +34,9 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 		return 0, fmt.Errorf("error writing XML header: %w", err)
 	}
 
-	startResults := xml.StartElement{Name: xml.Name{Local: "results"}}
+	startResults := xml.StartElement{Name: xml.Name{Local: XmlRootElement}}
 	if err := encoder.EncodeToken(startResults); err != nil {
-		return 0, fmt.Errorf("error starting <results>: %w", err)
+		return 0, fmt.Errorf("error starting <%s>: %w", XmlRootElement, err)
 	}
 
 	// get fields names
@@ -73,18 +52,27 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 		if err != nil {
 			return 0, fmt.Errorf("error reading row: %w", err)
 		}
-		xmlRow := XMLRow{
-			Fields: make(map[string]string),
+
+		startRow := xml.StartElement{Name: xml.Name{Local: XmlRowElement}}
+
+		if err := encoder.EncodeToken(startRow); err != nil {
+			return rowCount, fmt.Errorf("error starting <%s>: %w", XmlRowElement, err)
 		}
+
 		for i, field := range fields {
-			xmlRow.Fields[field] = toString(values[i])
+			elem := xml.StartElement{Name: xml.Name{Local: field}}
+			if err := encoder.EncodeElement(toString(values[i]), elem); err != nil {
+				return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
+			}
+		}
+
+		// End </row>
+		if err := encoder.EncodeToken(xml.EndElement{Name: startRow.Name}); err != nil {
+			return rowCount, fmt.Errorf("error closing </%s>: %w", XmlRowElement, err)
 		}
 
 		rowCount++
 
-		if err := encoder.Encode(xmlRow); err != nil {
-			return 0, fmt.Errorf("error encoding XML: %w", err)
-		}
 		if rowCount%10000 == 0 {
 			bufferedWriter.Flush()
 		}
@@ -96,7 +84,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 	}
 
 	if err := encoder.EncodeToken(xml.EndElement{Name: startResults.Name}); err != nil {
-		return 0, fmt.Errorf("error ending </results>: %w", err)
+		return 0, fmt.Errorf("error ending </%s>: %w", XmlRootElement, err)
 	}
 
 	// Add final newline

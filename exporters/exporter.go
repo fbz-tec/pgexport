@@ -20,6 +20,8 @@ type ExportOptions struct {
 	Delimiter   rune
 	TableName   string
 	Compression string
+	TimeFormat  string
+	TimeZone    string
 }
 
 // Exporter interface defines export operations

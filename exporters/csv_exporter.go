@@ -37,6 +37,9 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		return 0, fmt.Errorf("error writing headers: %w", err)
 	}
 
+	//datetime layout(Golang format) and timezone
+	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+
 	// Write data rows
 	rowCount := 0
 	for rows.Next() {
@@ -47,7 +50,7 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		//format values to strings
 		record := make([]string, len(values))
 		for i, v := range values {
-			record[i] = toString(v)
+			record[i] = fmt.Sprintf("%v", formatValue(v, layout, loc))
 		}
 
 		rowCount++

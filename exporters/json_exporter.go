@@ -37,6 +37,9 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		return 0, fmt.Errorf("error writing start of JSON array: %w", err)
 	}
 
+	//datetime layout(Golang format) and timezone
+	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+
 	rowCount := 0
 
 	for rows.Next() {
@@ -48,7 +51,7 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		//Convert row to map
 		entry := make(map[string]interface{}, len(keys))
 		for i, key := range keys {
-			entry[key] = formatValue(values[i])
+			entry[key] = formatValue(values[i], layout, loc)
 		}
 		rowCount++
 

@@ -20,6 +20,8 @@ var (
 	connString  string
 	tableName   string
 	compression string
+	timeFormat  string
+	timeZone    string
 )
 
 func main() {
@@ -70,8 +72,10 @@ Supported output formats:
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
+	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
+	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
 	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
-	rootCmd.Flags().StringVarP(&connString, "dsn", "c", "", "Database connection string (postgres://user:pass@host:port/dbname)")
+	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
 	rootCmd.Flags().Bool("with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
@@ -137,6 +141,8 @@ func runExport(cmd *cobra.Command, args []string) error {
 		Delimiter:   delimRune,
 		TableName:   tableName,
 		Compression: compression,
+		TimeFormat:  timeFormat,
+		TimeZone:    timeZone,
 	}
 
 	log.Println("Executing query...")
@@ -216,6 +222,20 @@ func validateExportParams() error {
 	// Validate table name for SQL format
 	if format == "sql" && strings.TrimSpace(tableName) == "" {
 		return fmt.Errorf("Error: --table (-t) is required when using SQL format")
+	}
+
+	// Validate time format if provided
+	if timeFormat != "" {
+		if err := exporters.ValidateTimeFormat(timeFormat); err != nil {
+			return fmt.Errorf("Error: Invalid time format '%s'. Use format like 'yyyy-MM-dd HH:mm:ss'", timeFormat)
+		}
+	}
+
+	// Validate timezone if provided
+	if timeZone != "" {
+		if err := exporters.ValidateTimeZone(timeZone); err != nil {
+			return fmt.Errorf("Error: Invalid timezone '%s'. Use format like 'UTC' or 'Europe/Paris'", timeZone)
+		}
 	}
 
 	return nil

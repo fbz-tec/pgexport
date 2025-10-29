@@ -577,3 +577,65 @@ func BenchmarkParseDelimiter(b *testing.B) {
 		})
 	}
 }
+
+func TestHandleExportResult(t *testing.T) {
+	// Save original value
+	originalFailOnEmpty := failOnEmpty
+	defer func() { failOnEmpty = originalFailOnEmpty }()
+
+	tests := []struct {
+		name        string
+		rowCount    int
+		failOnEmpty bool
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "success with rows",
+			rowCount:    100,
+			failOnEmpty: false,
+			wantErr:     false,
+		},
+		{
+			name:        "zero rows without fail flag",
+			rowCount:    0,
+			failOnEmpty: false,
+			wantErr:     false,
+		},
+		{
+			name:        "zero rows with fail flag",
+			rowCount:    0,
+			failOnEmpty: true,
+			wantErr:     true,
+			errContains: "query returned 0 rows",
+		},
+		{
+			name:        "success with rows and fail flag",
+			rowCount:    50,
+			failOnEmpty: true,
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			failOnEmpty = tt.failOnEmpty
+
+			err := handleExportResult(tt.rowCount, "/tmp/test.csv")
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("handleExportResult() expected error, got nil")
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("handleExportResult() error = %q, should contain %q", err.Error(), tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("handleExportResult() unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}

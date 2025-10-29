@@ -2,7 +2,6 @@ package exporters
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -26,12 +25,12 @@ type ExportOptions struct {
 
 // Exporter interface defines export operations
 type Exporter interface {
-	Export(rows pgx.Rows, outputPath string, options ExportOptions) error
+	Export(rows pgx.Rows, outputPath string, options ExportOptions) (int, error)
 }
 
 // Optional capability interface for exporters that can use PostgreSQL COPY
 type CopyCapable interface {
-	ExportCopy(conn *pgx.Conn, query string, outputPath string, options ExportOptions) error
+	ExportCopy(conn *pgx.Conn, query string, outputPath string, options ExportOptions) (int, error)
 }
 
 // dataExporter implements Exporter & CopyCapable interfaces
@@ -47,7 +46,7 @@ func NewCopyExporter() CopyCapable {
 }
 
 // Export exports query results to the specified format
-func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOptions) error {
+func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOptions) (int, error) {
 
 	var rowCount int
 	var err error
@@ -62,31 +61,29 @@ func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOp
 	case FormatSQL:
 		rowCount, err = e.writeSQL(rows, outputPath, options)
 	default:
-		return fmt.Errorf("unsupported format: %s", options.Format)
+		return 0, fmt.Errorf("unsupported format: %s", options.Format)
 	}
 
 	if err != nil {
-		return fmt.Errorf("error exporting to %s: %w", options.Format, err)
+		return rowCount, fmt.Errorf("error exporting to %s: %w", options.Format, err)
 	}
 
-	log.Printf("Successfully exported %d rows to %s", rowCount, outputPath)
-	return nil
+	return rowCount, nil
 }
 
-func (e *dataExporter) ExportCopy(conn *pgx.Conn, query string, outputPath string, options ExportOptions) error {
+func (e *dataExporter) ExportCopy(conn *pgx.Conn, query string, outputPath string, options ExportOptions) (int, error) {
 	var rowCount int
 	var err error
 	switch options.Format {
 	case FormatCSV:
 		rowCount, err = e.writeCopyCSV(conn, query, outputPath, options)
 	default:
-		return fmt.Errorf("unsupported format: %s", options.Format)
+		return 0, fmt.Errorf("unsupported format: %s", options.Format)
 	}
 
 	if err != nil {
-		return fmt.Errorf("error exporting to %s: %w", options.Format, err)
+		return rowCount, fmt.Errorf("error exporting to %s: %w", options.Format, err)
 	}
 
-	log.Printf("Successfully exported %d rows to %s", rowCount, outputPath)
-	return nil
+	return rowCount, nil
 }

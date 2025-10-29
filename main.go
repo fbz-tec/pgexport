@@ -22,6 +22,8 @@ var (
 	compression string
 	timeFormat  string
 	timeZone    string
+	withCopy    bool
+	failOnEmpty bool
 )
 
 func main() {
@@ -78,7 +80,8 @@ Supported output formats:
 	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
-	rootCmd.Flags().Bool("with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
+	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
+	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
@@ -134,8 +137,6 @@ func runExport(cmd *cobra.Command, args []string) error {
 	}
 	defer store.Close()
 
-	withCopy, _ := cmd.Flags().GetBool("with-copy")
-
 	options := exporters.ExportOptions{
 		Format:      format,
 		Delimiter:   delimRune,
@@ -152,11 +153,13 @@ func runExport(cmd *cobra.Command, args []string) error {
 		log.Println("Using PostgreSQL native COPY mode for CSV export...")
 		exporter := exporters.NewCopyExporter()
 
-		if err := exporter.ExportCopy(store.GetConnection(), query, outputPath, options); err != nil {
+		rowCount, err := exporter.ExportCopy(store.GetConnection(), query, outputPath, options)
+
+		if err != nil {
 			return fmt.Errorf("error exporting to %s: %w", options.Format, err)
 		}
 
-		return nil
+		return handleExportResult(rowCount, outputPath)
 	}
 
 	rows, err := store.ExecuteQuery(context.Background(), query)
@@ -167,11 +170,13 @@ func runExport(cmd *cobra.Command, args []string) error {
 
 	exporter := exporters.NewExporter()
 
-	if err := exporter.Export(rows, outputPath, options); err != nil {
+	rowCount, err := exporter.Export(rows, outputPath, options)
+
+	if err != nil {
 		return fmt.Errorf("export failed: %w", err)
 	}
 
-	return nil
+	return handleExportResult(rowCount, outputPath)
 }
 
 func validateExportParams() error {
@@ -267,4 +272,20 @@ func parseDelimiter(delim string) (rune, error) {
 	}
 
 	return runes[0], nil
+}
+
+func handleExportResult(rowCount int, outputPath string) error {
+	if rowCount == 0 {
+
+		if failOnEmpty {
+			return fmt.Errorf("export failed: query returned 0 rows")
+		}
+
+		log.Printf("Warning: Query returned 0 rows. File created at %s but contains no data rows.", outputPath)
+
+	} else {
+		log.Printf("Successfully exported %d rows to %s", rowCount, outputPath)
+	}
+
+	return nil
 }

@@ -13,6 +13,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 Direct connection string support with `--dsn` flag
 - 🛡️ Robust error handling and validation
+- ⚠️ Optional fail-on-empty mode (`--fail-on-empty`) for scripting and automation
 - ⚡ Optimized for performance with buffered I/O
 - 🗃️ Clean architecture with separated concerns
 - 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
@@ -135,7 +136,8 @@ pgxport [command] [flags]
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
-| `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
+| `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
+| `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | - | Database connection string | - | No |
 | `--help` | `-h` | Show help message | - | No |
@@ -168,6 +170,15 @@ pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
 # Export to SQL INSERT statements
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
+# Export to SQL INSERT statements with schema
+pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_backup
+
+# Export to different schema
+pgxport -s "SELECT * FROM users" -o users.sql -f sql -t backup.users
+
+# Complex schema names with special characters
+pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "my-schema"."my-table"
+
 # Export with gzip compression
 pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
 
@@ -191,7 +202,55 @@ pgxport --dsn "postgres://readonly:pass@replica:5432/mydb" \
          -s "SELECT * FROM large_table" \
          -o export.csv
 ```
+
+#### Handling Empty Results
+
+The `--fail-on-empty` flag is useful for scripting and automation when you want to ensure your query returns data.
+
+```bash
+# Default behavior: Warning message but exit code 0
+pgxport -s "SELECT * FROM users WHERE 1=0" -o empty.csv
+# Output: Warning: Query returned 0 rows. File created at empty.csv but contains no data rows.
+# Exit code: 0
+
+# Strict mode: Error and exit code 1
+pgxport -s "SELECT * FROM users WHERE 1=0" -o empty.csv --fail-on-empty
+# Output: Error: export failed: query returned 0 rows
+# Exit code: 1
+
+# Use in shell scripts for validation
+if ! pgxport -s "SELECT * FROM critical_data WHERE date = CURRENT_DATE" \
+             -o daily_export.csv --fail-on-empty; then
+    echo "❌ Export failed or returned no data!"
+    # Send alert, log error, etc.
+    exit 1
+fi
+echo "✅ Export successful with data"
+
+# Combine with other flags
+pgxport -s "SELECT * FROM orders WHERE status = 'pending'" \
+        -o pending_orders.csv \
+        --fail-on-empty \
+        -z gzip
+
+# Use in CI/CD pipelines
+pgxport -F validate_data.sql -o validation.csv --fail-on-empty || exit 1
+```
+
+**When to use `--fail-on-empty`:**
+- ✅ Data validation scripts
+- ✅ ETL pipelines where empty results indicate a problem
+- ✅ Automated reporting where no data is an error condition
+- ✅ CI/CD data quality checks
+- ✅ Scheduled exports that must contain data
+
+**When NOT to use `--fail-on-empty`:**
+- ❌ Exploratory queries where empty results are acceptable
+- ❌ Optional data exports
+- ❌ Queries with filters that may legitimately return no results
+
 #### Date/Time Formatting Examples
+
 ```bash
 # Export with custom date format (European style)
 pgxport -s "SELECT * FROM events" -o events.csv -T "dd/MM/yyyy HH:mm:ss"
@@ -313,6 +372,20 @@ pgxport -s "SELECT * FROM products" -o products.csv -f csv
 pgxport -s "SELECT * FROM products" -o products.json -f json
 pgxport -s "SELECT * FROM products" -o products.xml -f xml
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
+
+# Automated validation script
+#!/bin/bash
+set -e
+
+echo "Exporting daily metrics..."
+if ! pgxport -s "SELECT * FROM daily_metrics WHERE date = CURRENT_DATE" \
+             -o metrics.csv --fail-on-empty; then
+    echo "ERROR: No metrics found for today!"
+    # Send notification
+    exit 1
+fi
+
+echo "✅ Export completed successfully"
 ```
 
 ## 📊 Output Formats
@@ -332,16 +405,17 @@ id;name;email;created_at
 1;John Doe;john@example.com;2024-01-15T10:30:00.000
 2;Jane Smith;jane@example.com;2024-01-16T14:22:15.000
 ```
+
 ### ⚙️ COPY Mode (High-Performance CSV Export)
 
-The `--with-copy` flag enables PostgreSQL’s native COPY TO STDOUT mechanism for CSV exports.
+The `--with-copy` flag enables PostgreSQL's native COPY TO STDOUT mechanism for CSV exports.
 This mode streams data directly from the database server, reducing CPU and memory usage.
 
 **Benefits:**
 - 🚀 Up to 10× faster than row-by-row export for large datasets
 - 💾 Low memory footprint
 - 🗜️ Compatible with compression (gzip, zip)
-- 🔄 Identical CSV output format
+- 📄 Identical CSV output format
 
 **Limitations:**
 - ⚠️ **Ignores `--time-format` and `--time-zone` options**
@@ -362,6 +436,7 @@ Example usage:
 ```bash
 pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
 ```
+
 #### ⚠️ Note:
 
 When using --with-copy, PostgreSQL handles type serialization.
@@ -450,8 +525,10 @@ pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
 ```
 
 **SQL Format Features:**
+- ✅ **Schema-qualified table names**: Supports `schema.table` notation for cross-schema exports
 - ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL, bytea
 - ✅ **Automatic escaping**: Single quotes in strings are properly escaped (e.g., `O'Brien` → `'O''Brien'`)
+- ✅ **Identifier quoting**: Properly quotes table and column names to handle special characters
 - ✅ **Type-aware formatting**: Numbers and booleans without quotes, strings and dates with quotes
 - ✅ **NULL handling**: NULL values exported as SQL `NULL` keyword
 - ✅ **Ready to import**: Generated SQL can be directly executed on any PostgreSQL database
@@ -595,12 +672,14 @@ The tool provides clear error messages for common issues:
 - **Configuration errors**: Validate all required environment variables
 - **Format errors**: Ensure format is one of: csv, json, xml, sql
 - **SQL format errors**: Ensure `--table` flag is provided when using SQL format
+- **Empty result errors**: Use `--fail-on-empty` to treat 0 rows as an error
 
 Example error output:
 ```
 Error: Invalid format 'txt'. Valid formats are: csv, json, xml, sql
 Error: --table (-t) is required when using SQL format
 Error: Configuration error: DB_PORT must be a valid port number (1-65535)
+Error: export failed: query returned 0 rows
 ```
 
 ## 🤝 Contributing
@@ -632,6 +711,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~XML export format~~ ✅ Implemented!
 - [x] ~~SQL INSERT export format~~ ✅ Implemented!
 - [x] ~~High-performance CSV export using PostgreSQL COPY~~ ✅ Implemented!
+- [x] ~~Fail-on-empty flag for scripting and automation~~ ✅ Implemented!
 - [ ] Interactive password prompt (secure, no history)
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets

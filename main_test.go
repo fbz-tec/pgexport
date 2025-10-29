@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,7 +52,7 @@ WHERE active = true; -- filter by status`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary file in OS temp directory
+			// Create temporary file
 			tmpFile, err := os.CreateTemp("", "test_*.sql")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
@@ -92,7 +93,7 @@ func TestReadSQLFromFileErrors(t *testing.T) {
 		},
 		{
 			name:     "directory instead of file",
-			filepath: "/tmp",
+			filepath: os.TempDir(),
 		},
 	}
 
@@ -139,7 +140,7 @@ func TestReadSQLFromFileLargeFile(t *testing.T) {
 	// Create a large SQL content
 	var content string
 	for i := 0; i < 1000; i++ {
-		content += "SELECT * FROM users WHERE id = " + string(rune(i)) + ";\n"
+		content += "SELECT * FROM users WHERE id = 1;\n"
 	}
 
 	err := os.WriteFile(tmpFile, []byte(content), 0644)
@@ -162,7 +163,7 @@ func TestReadSQLFromFileUTF8(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "utf8.sql")
 
-	content := "SELECT * FROM users WHERE name = 'José García';"
+	content := "SELECT * FROM users WHERE name = 'José García éàç';"
 	err := os.WriteFile(tmpFile, []byte(content), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -175,6 +176,355 @@ func TestReadSQLFromFileUTF8(t *testing.T) {
 
 	if result != content {
 		t.Errorf("readSQLFromFile() = %q, want %q", result, content)
+	}
+}
+
+func TestParseDelimiter(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		expected  rune
+		wantError bool
+	}{
+		{
+			name:      "comma delimiter",
+			input:     ",",
+			expected:  ',',
+			wantError: false,
+		},
+		{
+			name:      "semicolon delimiter",
+			input:     ";",
+			expected:  ';',
+			wantError: false,
+		},
+		{
+			name:      "pipe delimiter",
+			input:     "|",
+			expected:  '|',
+			wantError: false,
+		},
+		{
+			name:      "tab delimiter",
+			input:     `\t`,
+			expected:  '\t',
+			wantError: false,
+		},
+		{
+			name:      "tab with spaces",
+			input:     `  \t  `,
+			expected:  '\t',
+			wantError: false,
+		},
+		{
+			name:      "space delimiter",
+			input:     " ",
+			expected:  ' ',
+			wantError: true,
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			wantError: true,
+		},
+		{
+			name:      "multiple characters",
+			input:     ",,",
+			wantError: true,
+		},
+		{
+			name:      "word instead of delimiter",
+			input:     "comma",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseDelimiter(tt.input)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("parseDelimiter(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("parseDelimiter(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+
+			if result != tt.expected {
+				t.Errorf("parseDelimiter(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestValidateExportParams(t *testing.T) {
+	// Save original values
+	originalSqlQuery := sqlQuery
+	originalSqlFile := sqlFile
+	originalFormat := format
+	originalCompression := compression
+	originalTableName := tableName
+	originalTimeFormat := timeFormat
+	originalTimeZone := timeZone
+
+	// Restore original values after test
+	defer func() {
+		sqlQuery = originalSqlQuery
+		sqlFile = originalSqlFile
+		format = originalFormat
+		compression = originalCompression
+		tableName = originalTableName
+		timeFormat = originalTimeFormat
+		timeZone = originalTimeZone
+	}()
+
+	tests := []struct {
+		name        string
+		setupFunc   func()
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid CSV format",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = "yyyy-MM-dd HH:mm:ss"
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid JSON format",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "json"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid XML format",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "xml"
+				compression = "gzip"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid SQL format with table name",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "sql"
+				compression = "none"
+				tableName = "users_backup"
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "no SQL query or file",
+			setupFunc: func() {
+				sqlQuery = ""
+				sqlFile = ""
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "Either --sql or --sqlfile must be provided",
+		},
+		{
+			name: "both SQL query and file",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = "query.sql"
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "Cannot use both --sql and --sqlfile",
+		},
+		{
+			name: "invalid format",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "txt"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "Invalid format",
+		},
+		{
+			name: "SQL format without table name",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "sql"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "--table (-t) is required",
+		},
+		{
+			name: "SQL format with whitespace-only table name",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "sql"
+				compression = "none"
+				tableName = "   "
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "--table (-t) is required",
+		},
+		{
+			name: "invalid compression",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "bzip2"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr:     true,
+			errContains: "Invalid compression",
+		},
+		{
+			name: "invalid timezone",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = "yyyy-MM-dd HH:mm:ss"
+				timeZone = "Invalid/Timezone"
+			},
+			wantErr:     true,
+			errContains: "Invalid timezone",
+		},
+		{
+			name: "valid timezone UTC",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = "yyyy-MM-dd HH:mm:ss"
+				timeZone = "UTC"
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid timezone America/New_York",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "none"
+				tableName = ""
+				timeFormat = "yyyy-MM-dd HH:mm:ss"
+				timeZone = "America/New_York"
+			},
+			wantErr: false,
+		},
+		{
+			name: "compression with uppercase",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "GZIP"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "compression with whitespace",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "csv"
+				compression = "  zip  "
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "format with uppercase",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "CSV"
+				compression = "none"
+				tableName = ""
+				timeFormat = ""
+				timeZone = ""
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupFunc()
+			err := validateExportParams()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("validateExportParams() expected error, got nil")
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("validateExportParams() error = %q, should contain %q", err.Error(), tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validateExportParams() unexpected error: %v", err)
+				}
+			}
+		})
 	}
 }
 
@@ -213,5 +563,17 @@ func BenchmarkReadSQLFromFileLarge(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = readSQLFromFile(tmpFile)
+	}
+}
+
+func BenchmarkParseDelimiter(b *testing.B) {
+	delimiters := []string{",", ";", "|", "\t", " "}
+
+	for _, delim := range delimiters {
+		b.Run(delim, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _ = parseDelimiter(delim)
+			}
+		})
 	}
 }

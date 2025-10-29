@@ -98,6 +98,12 @@ func convertUserTimeFormat(userTimefmt string) string {
 
 // ValidateTimeFormat validates that a time format is valid by testing it
 func ValidateTimeFormat(format string) error {
+
+	// Empty format is invalid
+	if format == "" {
+		return fmt.Errorf("time format cannot be empty")
+	}
+
 	// Test the format with a known time
 	testTime := time.Date(2006, 1, 2, 15, 4, 5, 123456789, time.UTC)
 	layout := convertUserTimeFormat(format)

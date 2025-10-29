@@ -46,6 +46,9 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 		fields[i] = string(fd.Name)
 	}
 
+	//datetime layout(Golang format) and timezone
+	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+
 	rowCount := 0
 	for rows.Next() {
 		values, err := rows.Values()
@@ -61,7 +64,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 		for i, field := range fields {
 			elem := xml.StartElement{Name: xml.Name{Local: field}}
-			if err := encoder.EncodeElement(toString(values[i]), elem); err != nil {
+			if err := encoder.EncodeElement(formatValue(values[i], layout, loc), elem); err != nil {
 				return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
 			}
 		}

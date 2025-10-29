@@ -85,15 +85,14 @@ Pass the connection string directly via command line:
 
 ```bash
 pgxport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
-# or with short flag
-pgxport -c "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
+
 ```
 
 ### Configuration Priority
 
 The system uses the following priority order:
 
-1. **`--dsn` / `-c` flag** (highest priority, overrides everything)
+1. **`--dsn` flag** (highest priority, overrides everything)
 2. **Environment variables** (if defined, override `.env`)
 3. **`.env` file** (if present)
 4. **Default values** (lowest priority)
@@ -132,11 +131,13 @@ pgxport [command] [flags]
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
 | `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
+| `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
+| `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports | - | For SQL format |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
-| `--dsn` | `-c` | Database connection string | - | No |
+| `--dsn` | - | Database connection string | - | No |
 | `--help` | `-h` | Show help message | - | No |
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
@@ -185,16 +186,79 @@ pgxport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
          -s "SELECT * FROM users LIMIT 5" \
          -o users.csv
 
-# Short form
-pgxport -c "postgres://myuser:mypass@prod-server:5432/analytics" \
-         -s "SELECT * FROM metrics WHERE date = CURRENT_DATE" \
-         -o daily_metrics.csv
-
 # Override .env with different database
-pgxport -c "postgres://readonly:pass@replica:5432/mydb" \
+pgxport --dsn "postgres://readonly:pass@replica:5432/mydb" \
          -s "SELECT * FROM large_table" \
          -o export.csv
 ```
+#### Date/Time Formatting Examples
+```bash
+# Export with custom date format (European style)
+pgxport -s "SELECT * FROM events" -o events.csv -T "dd/MM/yyyy HH:mm:ss"
+
+# Export with ISO 8601 format with milliseconds
+pgxport -s "SELECT * FROM logs" -o logs.csv -T "yyyy-MM-ddTHH:mm:ss.SSS"
+
+# Export with US date format
+pgxport -s "SELECT * FROM orders" -o orders.csv -T "MM/dd/yyyy HH:mm:ss"
+
+# Export with timezone conversion to UTC
+pgxport -s "SELECT * FROM events" -o events.csv -Z "UTC"
+
+# Export with timezone conversion to America/New_York
+pgxport -s "SELECT * FROM events" -o events.csv -Z "America/New_York"
+
+# Combine custom format and timezone
+pgxport -s "SELECT created_at FROM users" -o users.csv \
+  -T "dd/MM/yyyy HH:mm:ss" -Z "Europe/Paris"
+
+# Export to JSON with custom date format and timezone
+pgxport -s "SELECT * FROM products" -o products.json -f json \
+  -T "yyyy-MM-dd HH:mm:ss" -Z "America/Los_Angeles"
+```
+
+#### Time Format Tokens
+
+The `--time-format` flag accepts the following tokens:
+
+| Token | Description | Example |
+|-------|-------------|---------|
+| `yyyy` | 4-digit year | 2025 |
+| `yy` | 2-digit year | 24 |
+| `MM` | Month (01-12) | 03 |
+| `dd` | Day (01-31) | 15 |
+| `HH` | Hour 24h (00-23) | 14 |
+| `mm` | Minute (00-59) | 30 |
+| `ss` | Second (00-59) | 45 |
+| `SSS` | Milliseconds | 123 |
+| `S` | Deciseconds | 1 |
+
+**Common Format Examples:**
+- ISO 8601: `yyyy-MM-ddTHH:mm:ss.SSS`
+- European: `dd/MM/yyyy HH:mm:ss`
+- US: `MM/dd/yyyy HH:mm:ss`
+- Date only: `yyyy-MM-dd`
+- Time only: `HH:mm:ss`
+
+#### Timezone Support
+
+The `--time-zone` flag accepts standard IANA timezone names:
+
+**Common Timezones:**
+- `UTC` - Coordinated Universal Time
+- `America/New_York` - US Eastern Time
+- `America/Los_Angeles` - US Pacific Time
+- `America/Chicago` - US Central Time
+- `Europe/London` - UK Time
+- `Europe/Paris` - Central European Time
+- `Asia/Tokyo` - Japan Standard Time
+- `Australia/Sydney` - Australian Eastern Time
+
+**Default Behavior:**
+- If `--time-zone` is not specified, the local system timezone is used
+- If an invalid timezone is provided, a warning is displayed and local timezone is used
+
+**Full timezone list:** [IANA Time Zone Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 
 #### Advanced Examples
 
@@ -241,8 +305,8 @@ else
 fi
 
 # Connect to different environments
-pgxport -c "$DEV_DATABASE_URL" -s "SELECT * FROM users" -o dev_users.csv
-pgxport -c "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
+pgxport --dsn "$DEV_DATABASE_URL" -s "SELECT * FROM users" -o dev_users.csv
+pgxport --dsn "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
 
 # Export same data in different formats
 pgxport -s "SELECT * FROM products" -o products.csv -f csv
@@ -257,7 +321,8 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
 - **Default delimiter**: `,` (comma)
 - Headers included automatically
-- Timestamps formatted as `2006-01-02T15:04:05.000`
+- **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
+- **Timezone**: Local system time (customizable with `--time-zone`)
 - NULL values exported as empty strings
 - Buffered I/O for optimal performance
 
@@ -272,11 +337,26 @@ id;name;email;created_at
 The `--with-copy` flag enables PostgreSQL’s native COPY TO STDOUT mechanism for CSV exports.
 This mode streams data directly from the database server, reducing CPU and memory usage.
 
-Benefits:
+**Benefits:**
 - 🚀 Up to 10× faster than row-by-row export for large datasets
 - 💾 Low memory footprint
 - 🗜️ Compatible with compression (gzip, zip)
 - 🔄 Identical CSV output format
+
+**Limitations:**
+- ⚠️ **Ignores `--time-format` and `--time-zone` options**
+- ⚠️ Uses PostgreSQL's default date/time formatting
+- Only works with CSV format
+
+**When to use:**
+- Large datasets (>100k rows)
+- Performance is critical
+- Default date format is acceptable
+
+**When NOT to use:**
+- Need custom date/time formatting
+- Need specific timezone conversion
+- Working with small datasets (<10k rows)
 
 Example usage:
 ```bash
@@ -291,7 +371,8 @@ Date and timestamp formats may differ from standard csv export.
 
 - Pretty-printed with 2-space indentation
 - Array of objects format
-- Timestamps formatted as `2006-01-02T15:04:05.000`
+- **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
+- **Timezone**: Local system time (customizable with `--time-zone`)
 - NULL values preserved as `null`
 - Optimized encoding with buffered I/O
 
@@ -302,13 +383,13 @@ Date and timestamp formats may differ from standard csv export.
     "id": 1,
     "name": "John Doe",
     "email": "john@example.com",
-    "created_at": "2024-01-15T10:30:00.000"
+    "created_at": "2024-01-15 10:30:00"
   },
   {
     "id": 2,
     "name": "Jane Smith",
     "email": "jane@example.com",
-    "created_at": "2024-01-16T14:22:15.000"
+    "created_at": "2024-01-16 14:22:15"
   }
 ]
 ```
@@ -318,7 +399,8 @@ Date and timestamp formats may differ from standard csv export.
 - Pretty-printed with 2-space indentation
 - Structured with `<results>` root and `<row>` elements
 - Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
-- Timestamps formatted as `2006-01-02T15:04:05.000`
+- **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
+- **Timezone**: Local system time (customizable with `--time-zone`)
 - NULL values exported as empty strings
 - Buffered I/O for optimal performance
 
@@ -493,7 +575,7 @@ go build -o pgxport
 2. **Avoid passwords in command line**:
    - ❌ Bad: `pgxport --dsn "postgres://user:password123@host/db" ...` (visible in history)
    - ✅ Good: Use `.env` file or environment variables
-   - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgxport -c "$DATABASE_URL" ...`
+   - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgxport --dsn "$DATABASE_URL" ...`
 
 3. **Use parameterized queries**: When using dynamic SQL, be aware of SQL injection risks
 
@@ -554,7 +636,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets
 - [ ] Progress bar for long-running queries
-- [ ] Multiple database support (MySQL, SQLite, SQL Server)
 - [ ] Query result preview before export
 - [x] ~~Streaming mode for huge datasets~~ ✅ Implemented!
 - [x] ~~Compression support (gzip, zip)~~ ✅ Implemented!

@@ -46,16 +46,21 @@ jobs:
         run: |
           set -e
           mkdir -p build
+
+          # Compute short commit hash
+          GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          VERSION="dev-${GIT_COMMIT}"
+
           # Build Linux binary
-          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.Version=${{ github.ref_name }} \
-                             -X main.GitCommit=${{ github.sha }} \
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
+                             -X main.GitCommit=${GIT_COMMIT} \
                              -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
                    -o build/pgxport
           
 
           # Build Windows binary
-          GOOS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${{ github.ref_name }} \
-                                                       -X main.GitCommit=${{ github.sha }} \
+          GOOS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
+                                                       -X main.GitCommit=${GIT_COMMIT} \
                                                        -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
                                                  -o build/pgxport.exe
 

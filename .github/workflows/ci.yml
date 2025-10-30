@@ -42,19 +42,46 @@ jobs:
           go test -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out
 
-      - name: 🏗️ Build binary
+      - name: 🏗️ Build binaries
         run: |
-          go build -ldflags="-X main.Version=${{ github.ref_name }} \
-                             -X main.GitCommit=${{ github.sha }} \
-                             -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-                   -o pgxport
-          ./pgxport version
+          set -e
+          mkdir -p build
 
-      - name: 📤 Upload build artifact
+          # Compute short commit hash
+          GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          VERSION="dev-${GIT_COMMIT}"
+
+          # Build Linux binary
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
+                             -X main.GitCommit=${GIT_COMMIT} \
+                             -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                   -o build/pgxport
+          
+
+          # Build Windows binary
+          GOOS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
+                                                       -X main.GitCommit=${GIT_COMMIT} \
+                                                       -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                                                 -o build/pgxport.exe
+
+      - name: 📤 Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pgxport-${{ runner.os }}-${{ runner.arch }}
-          path: pgxport
+          name: pgxport-linux-amd64
+          path: build/pgxport
+      
+      - name: 📤 Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgxport-windows-amd64
+          path: build/pgxport.exe
+            
+      - name: 🧹 Cleanup build directory
+        if: always() # Ensures cleanup runs even if previous step fails
+        run: |
+          echo "🧹 Cleaning up build artifacts..."
+          rm -rf build
+          echo "✅ Cleanup done."
 
   release:
     name: 🚀 Publish GitHub Release

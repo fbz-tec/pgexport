@@ -480,7 +480,7 @@ func TestWriteSQLLargeDataset(t *testing.T) {
 	outputPath := filepath.Join(tmpDir, "large.sql")
 
 	// Generate 1,000 rows
-	query := "SELECT generate_series(1, 1000) as id, md5(random()::text) as data"
+	query := "SELECT i, 'data_' || i FROM generate_series(1, 1000) AS s(i)"
 
 	ctx := context.Background()
 	rows, err := conn.Query(ctx, query)

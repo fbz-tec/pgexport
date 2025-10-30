@@ -471,7 +471,7 @@ func TestWriteCSVLargeDataset(t *testing.T) {
 	outputPath := filepath.Join(tmpDir, "large.csv")
 
 	// Generate 10,000 rows
-	query := "SELECT generate_series(1, 10000) as id, md5(random()::text) as data"
+	query := "SELECT i, 'data_' || i FROM generate_series(1, 10000) AS s(i)"
 
 	ctx := context.Background()
 	rows, err := conn.Query(ctx, query)

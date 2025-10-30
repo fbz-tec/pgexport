@@ -42,19 +42,33 @@ jobs:
           go test -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out
 
-      - name: 🏗️ Build binary
+      - name: 🏗️ Build binaries
         run: |
-          go build -ldflags="-X main.Version=${{ github.ref_name }} \
+          mkdir build
+          # Build Linux binary
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.Version=${{ github.ref_name }} \
                              -X main.GitCommit=${{ github.sha }} \
                              -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-                   -o pgxport
-          ./pgxport version
+                   -o build/pgxport
+          
+          # Compress Linux binary as .tar.gz
+          tar -czf pgxport-linux-amd64.gz -C build/pgxport
+
+          # Build Windows binary
+          OS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${{ github.ref_name }} \
+                                                       -X main.GitCommit=${{ github.sha }} \
+                                                       -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                                                 -o build/pgxport.exe
+          # Compress Windows binary as .zip                                       
+          zip -j pgxport-windows-amd64.zip build/pgxport.exe
 
       - name: 📤 Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pgxport-${{ runner.os }}-${{ runner.arch }}
-          path: pgxport
+          name: pgxport-artifacts
+          path: |
+            pgxport-linux-amd64.gz
+            pgxport-windows-amd64.zip
 
   release:
     name: 🚀 Publish GitHub Release

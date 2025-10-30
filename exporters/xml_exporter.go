@@ -64,6 +64,15 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 		for i, field := range fields {
 			elem := xml.StartElement{Name: xml.Name{Local: field}}
+			if values[i] == nil {
+				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
+					return rowCount, fmt.Errorf("error starting <%s>: %w", elem, err)
+				}
+				if err := encoder.EncodeToken(xml.EndElement{Name: elem.Name}); err != nil {
+					return rowCount, fmt.Errorf("error closing </%s>: %w", elem, err)
+				}
+				continue
+			}
 			if err := encoder.EncodeElement(formatValue(values[i], layout, loc), elem); err != nil {
 				return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
 			}

@@ -1,0 +1,95 @@
+name: CI - Build, Test & Release
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+      - 'fix/*'
+    tags:
+      - 'v*.*.*' # Trigger release workflow when pushing a version tag (e.g., v1.0.0)
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 🧪 Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🧰 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 🔍 Verify Go version
+        run: go version
+
+      - name: 📦 Download dependencies
+        run: go mod download
+
+      - name: 🧪 Run unit tests
+        run: go test -v ./...
+
+      - name: 📊 Run tests with coverage
+        run: |
+          go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
+
+      - name: 🏗️ Build binary
+        run: |
+          go build -ldflags="-X main.Version=${{ github.ref_name }} \
+                             -X main.GitCommit=${{ github.sha }} \
+                             -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                   -o pgxport
+          ./pgxport version
+
+      - name: 📤 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgxport-${{ runner.os }}-${{ runner.arch }}
+          path: pgxport
+
+  release:
+    name: 🚀 Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🧰 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: 🏗️ Build release binaries
+        run: |
+          mkdir dist
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-linux-amd64
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-windows-amd64.exe
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-macos-amd64
+
+      - name: 🧮 Generate checksums
+        run: |
+          cd dist
+          for file in *; do
+            sha256sum "$file" > "$file.sha256"
+          done
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

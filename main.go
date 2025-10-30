@@ -58,7 +58,8 @@ Supported output formats:
 
    # Export to SQL insert statements
   pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders_table`,
-		RunE: runExport,
+		RunE:         runExport,
+		SilenceUsage: true,
 	}
 
 	// Version command

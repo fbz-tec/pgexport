@@ -1,5 +1,9 @@
 # pgxport
 
+[![CI - Build, Test & Release](https://github.com/fbz-tec/pgxport/actions/workflows/ci.yml/badge.svg)](https://github.com/fbz-tec/pgxport/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fbz-tec/pgxport)](https://goreportcard.com/report/github.com/fbz-tec/pgxport)
+[![License](https://img.shields.io/github/license/fbz-tec/pgxport.svg)](LICENSE)
+
 A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON, SQL).
 
 ## ✨ Features

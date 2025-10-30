@@ -18,6 +18,23 @@ jobs:
     name: 🧪 Build & Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pgxport
+          POSTGRES_PASSWORD: pgxport
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pgxport -d testdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DB_TEST_URL: postgres://pgxport:pgxport@localhost:5432/testdb?sslmode=disable
+    
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -34,12 +51,18 @@ jobs:
       - name: 📦 Download dependencies
         run: go mod download
 
-      - name: 🧪 Run unit tests
-        run: go test -v ./...
-
       - name: 📊 Run tests with coverage
         run: |
-          go test -coverprofile=coverage.out ./...
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..10}; do
+            if pg_isready -h localhost -p 5432 -U pgxport -d testdb; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "PostgreSQL not ready yet... retrying in 3s"
+            sleep 3
+          done
+          go test -v -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out
 
       - name: 🏗️ Build binaries

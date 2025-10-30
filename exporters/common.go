@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var timeFormatReplacer = strings.NewReplacer(
@@ -59,6 +61,16 @@ func formatSQLValue(v interface{}) string {
 		return fmt.Sprintf("%d", val)
 	case float32, float64:
 		return fmt.Sprintf("%.15g", val)
+	case pgtype.Numeric:
+		if !val.Valid {
+			return "NULL"
+		}
+
+		f, err := val.Float64Value()
+		if err != nil || !f.Valid {
+			return "NULL"
+		}
+		return fmt.Sprintf("%.15g", f.Float64)
 	default:
 		str := fmt.Sprintf("%v", val)
 		escaped := strings.ReplaceAll(str, "'", "''")

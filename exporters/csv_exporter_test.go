@@ -514,6 +514,315 @@ func TestWriteCSVLargeDataset(t *testing.T) {
 	}
 }
 
+func TestWriteCSVNoHeader(t *testing.T) {
+	conn, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	tests := []struct {
+		name      string
+		query     string
+		noHeader  bool
+		checkFunc func(t *testing.T, path string, noHeader bool)
+	}{
+		{
+			name:     "CSV with header (default)",
+			query:    "SELECT 1 as id, 'test' as name, true as active",
+			noHeader: false,
+			checkFunc: func(t *testing.T, path string, noHeader bool) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 2 { // header + 1 data row
+					t.Errorf("Expected 2 records (header + data), got %d", len(records))
+				}
+
+				// Check header row
+				if len(records) > 0 {
+					header := records[0]
+					if !contains(header, "id") || !contains(header, "name") || !contains(header, "active") {
+						t.Errorf("Header missing expected columns: %v", header)
+					}
+				}
+
+				// Check data row
+				if len(records) > 1 {
+					dataRow := records[1]
+					if len(dataRow) != 3 {
+						t.Errorf("Expected 3 columns in data row, got %d", len(dataRow))
+					}
+				}
+			},
+		},
+		{
+			name:     "CSV without header",
+			query:    "SELECT 1 as id, 'test' as name, true as active",
+			noHeader: true,
+			checkFunc: func(t *testing.T, path string, noHeader bool) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 1 { // only data row, no header
+					t.Errorf("Expected 1 record (data only), got %d", len(records))
+				}
+
+				// First row should be data, not header
+				if len(records) > 0 {
+					firstRow := records[0]
+					if len(firstRow) != 3 {
+						t.Errorf("Expected 3 columns in data row, got %d", len(firstRow))
+					}
+					// First column should be "1", not "id"
+					if firstRow[0] != "1" {
+						t.Errorf("First row should contain data '1', got %q", firstRow[0])
+					}
+					// Should not contain column names
+					if firstRow[0] == "id" || firstRow[1] == "name" || firstRow[2] == "active" {
+						t.Error("First row should not contain column names when noHeader is true")
+					}
+				}
+			},
+		},
+		{
+			name:     "CSV without header - multiple rows",
+			query:    "SELECT generate_series(1, 10) as num, 'row' || generate_series(1, 10) as label",
+			noHeader: true,
+			checkFunc: func(t *testing.T, path string, noHeader bool) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 10 { // only data rows, no header
+					t.Errorf("Expected 10 records (data only), got %d", len(records))
+				}
+
+				// Verify first row is data, not header
+				if len(records) > 0 {
+					firstRow := records[0]
+					if firstRow[0] == "num" || firstRow[1] == "label" {
+						t.Error("First row contains column names instead of data")
+					}
+					if firstRow[0] != "1" {
+						t.Errorf("First data value should be '1', got %q", firstRow[0])
+					}
+				}
+			},
+		},
+		{
+			name:     "CSV without header - empty result",
+			query:    "SELECT 1 as id WHERE 1=0",
+			noHeader: true,
+			checkFunc: func(t *testing.T, path string, noHeader bool) {
+				content, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("Failed to read file: %v", err)
+				}
+
+				if len(content) != 0 {
+					t.Errorf("Expected empty file for empty result with noHeader, got %d bytes", len(content))
+				}
+			},
+		},
+		{
+			name:     "CSV with header - empty result",
+			query:    "SELECT 1 as id WHERE 1=0",
+			noHeader: false,
+			checkFunc: func(t *testing.T, path string, noHeader bool) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 1 { // only header
+					t.Errorf("Expected 1 record (header only), got %d", len(records))
+				}
+
+				if len(records) > 0 && records[0][0] != "id" {
+					t.Error("Expected header row to contain column name 'id'")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			outputPath := filepath.Join(tmpDir, "output.csv")
+
+			ctx := context.Background()
+			rows, err := conn.Query(ctx, tt.query)
+			if err != nil {
+				t.Fatalf("Failed to execute query: %v", err)
+			}
+			defer rows.Close()
+
+			exporter := &dataExporter{}
+			options := ExportOptions{
+				Format:      FormatCSV,
+				Delimiter:   ',',
+				Compression: "none",
+				TimeFormat:  "yyyy-MM-dd HH:mm:ss",
+				TimeZone:    "",
+				NoHeader:    tt.noHeader,
+			}
+
+			_, err = exporter.writeCSV(rows, outputPath, options)
+			if err != nil {
+				t.Fatalf("writeCSV() error: %v", err)
+			}
+
+			tt.checkFunc(t, outputPath, tt.noHeader)
+		})
+	}
+}
+
+func TestWriteCopyCSVNoHeader(t *testing.T) {
+	conn, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	tests := []struct {
+		name      string
+		query     string
+		noHeader  bool
+		checkFunc func(t *testing.T, path string)
+	}{
+		{
+			name:     "COPY with header",
+			query:    "SELECT 1 as id, 'test' as name",
+			noHeader: false,
+			checkFunc: func(t *testing.T, path string) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 2 {
+					t.Errorf("Expected 2 records (header + data), got %d", len(records))
+				}
+
+				if len(records) > 0 && records[0][0] != "id" {
+					t.Error("Expected header row with column name 'id'")
+				}
+			},
+		},
+		{
+			name:     "COPY without header",
+			query:    "SELECT 1 as id, 'test' as name",
+			noHeader: true,
+			checkFunc: func(t *testing.T, path string) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 1 {
+					t.Errorf("Expected 1 record (data only), got %d", len(records))
+				}
+
+				// First row should be data
+				if len(records) > 0 && records[0][0] != "1" {
+					t.Errorf("First row should contain data '1', got %q", records[0][0])
+				}
+			},
+		},
+		{
+			name:     "COPY without header - multiple rows",
+			query:    "SELECT generate_series(1, 100) as num",
+			noHeader: true,
+			checkFunc: func(t *testing.T, path string) {
+				f, err := os.Open(path)
+				if err != nil {
+					t.Fatalf("Failed to open file: %v", err)
+				}
+				defer f.Close()
+
+				reader := csv.NewReader(f)
+				records, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("Failed to parse CSV: %v", err)
+				}
+
+				if len(records) != 100 {
+					t.Errorf("Expected 100 records, got %d", len(records))
+				}
+
+				// Verify no header
+				if records[0][0] == "num" {
+					t.Error("First row should not be header")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			outputPath := filepath.Join(tmpDir, "output.csv")
+
+			exporter := &dataExporter{}
+			options := ExportOptions{
+				Format:      FormatCSV,
+				Delimiter:   ',',
+				Compression: "none",
+				NoHeader:    tt.noHeader,
+			}
+
+			_, err := exporter.writeCopyCSV(conn, tt.query, outputPath, options)
+			if err != nil {
+				t.Fatalf("writeCopyCSV() error: %v", err)
+			}
+
+			tt.checkFunc(t, outputPath)
+		})
+	}
+}
+
 func BenchmarkWriteCSV(b *testing.B) {
 	testURL := os.Getenv("DB_TEST_URL")
 	if testURL == "" {

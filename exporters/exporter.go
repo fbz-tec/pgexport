@@ -21,6 +21,7 @@ type ExportOptions struct {
 	Compression string
 	TimeFormat  string
 	TimeZone    string
+	NoHeader    bool
 }
 
 // Exporter interface defines export operations

@@ -27,14 +27,16 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 	defer writer.Flush()
 
 	// Write headers
-	fieldDescriptions := rows.FieldDescriptions()
-	headers := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
-		headers[i] = string(fd.Name)
-	}
+	if !options.NoHeader {
+		fieldDescriptions := rows.FieldDescriptions()
+		headers := make([]string, len(fieldDescriptions))
+		for i, fd := range fieldDescriptions {
+			headers[i] = string(fd.Name)
+		}
 
-	if err := writer.Write(headers); err != nil {
-		return 0, fmt.Errorf("error writing headers: %w", err)
+		if err := writer.Write(headers); err != nil {
+			return 0, fmt.Errorf("error writing headers: %w", err)
+		}
 	}
 
 	//datetime layout(Golang format) and timezone
@@ -80,7 +82,7 @@ func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string
 
 	defer writerCloser.Close()
 
-	copySql := fmt.Sprintf("COPY (%s) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER '%c')", query, options.Delimiter)
+	copySql := fmt.Sprintf("COPY (%s) TO STDOUT WITH (FORMAT csv, HEADER %t, DELIMITER '%c')", query, !options.NoHeader, options.Delimiter)
 
 	tag, err := conn.PgConn().CopyTo(context.Background(), writerCloser, copySql)
 	if err != nil {

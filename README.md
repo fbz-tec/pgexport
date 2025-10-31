@@ -13,6 +13,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 📊 Export to CSV, JSON, XML, and SQL formats
 - ⚡ High-performance CSV export using PostgreSQL native COPY mode (`--with-copy`)
 - 🔧 Customizable CSV delimiter
+- 🔧 Customizable CSV delimiter and header control (`--no-header`) 
 - 🗜️ Optional gzip or zip compression for exported files
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 Direct connection string support with `--dsn` flag
@@ -139,6 +140,7 @@ pgxport [command] [flags]
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
+| `--no-header` | - | Skip CSV header row in output | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
@@ -158,6 +160,9 @@ pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
 # Export with semicolon delimiter
 pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
+
+# New: Skip header row with --no-header
+pgxport -s "SELECT id, name, email FROM users" -o users.csv -f csv --no-header
 
 # Execute query from a SQL file
 pgxport -F queries/monthly_report.sql -o report.csv
@@ -548,14 +553,14 @@ pgxport/
 │   ├── csv_exporter.go # CSV export implementation
 │   ├── json_exporter.go# JSON export implementation
 │   ├── xml_exporter.go # XML export implementation
-│   ├── sql_exporter.go # SQL export implementation
-│   └── README.md       # Package documentation
+│   └── sql_exporter.go # SQL export implementation
 ├── main.go             # CLI entry point and orchestration
 ├── config.go           # Configuration management with validation
 ├── store.go            # Database operations (connection, queries)
 ├── version.go          # Version information
 ├── go.mod              # Go module definition
 ├── go.sum              # Go module checksums
+├── LICENSE             # MIT license file
 └── README.md           # Documentation
 ```
 
@@ -716,7 +721,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~SQL INSERT export format~~ ✅ Implemented!
 - [x] ~~High-performance CSV export using PostgreSQL COPY~~ ✅ Implemented!
 - [x] ~~Fail-on-empty flag for scripting and automation~~ ✅ Implemented!
-- [ ] Interactive password prompt (secure, no history)
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets
 - [ ] Progress bar for long-running queries

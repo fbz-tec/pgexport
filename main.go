@@ -24,6 +24,7 @@ var (
 	timeZone    string
 	withCopy    bool
 	failOnEmpty bool
+	noHeader    bool
 )
 
 func main() {
@@ -83,6 +84,7 @@ Supported output formats:
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
 	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
 	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
+	rootCmd.Flags().BoolVar(&noHeader, "no-header", false, "Skip header row in CSV output")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
@@ -145,6 +147,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		Compression: compression,
 		TimeFormat:  timeFormat,
 		TimeZone:    timeZone,
+		NoHeader:    noHeader,
 	}
 
 	log.Println("Executing query...")

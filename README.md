@@ -12,7 +12,6 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 📄 Run SQL queries from files
 - 📊 Export to CSV, JSON, XML, and SQL formats
 - ⚡ High-performance CSV export using PostgreSQL native COPY mode (`--with-copy`)
-- 🔧 Customizable CSV delimiter
 - 🔧 Customizable CSV delimiter and header control (`--no-header`) 
 - 🗜️ Optional gzip or zip compression for exported files
 - ⚙️ Simple configuration via environment variables or `.env` file
@@ -518,6 +517,16 @@ Date and timestamp formats may differ from standard csv export.
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
+
+# Export to a table in a specific schema
+pgxport -s "SELECT * FROM users" -o users.sql -f sql -t public.users
+
+# Export to a backup schema
+pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t backup.orders
+
+# Schema or table names with special characters
+pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "\"my-schema\".\"my-table\""
+
 ```
 
 **Usage example:**

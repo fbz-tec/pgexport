@@ -18,6 +18,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 🔗 Direct connection string support with `--dsn` flag
 - 🛡️ Robust error handling and validation
 - ⚠️ Optional fail-on-empty mode (`--fail-on-empty`) for scripting and automation
+- 🔍 Verbose mode (`--verbose`) with detailed debug information
 - ⚡ Optimized for performance with buffered I/O
 - 🗃️ Clean architecture with separated concerns
 - 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
@@ -145,6 +146,7 @@ pgxport [command] [flags]
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | - | Database connection string | - | No |
+| `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
 | `--help` | `-h` | Show help message | - | No |
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
@@ -396,6 +398,47 @@ fi
 echo "✅ Export completed successfully"
 ```
 
+## 🔍 Verbose Mode
+
+Enable detailed logging for troubleshooting with the `--verbose` (or `-v`) flag:
+
+```bash
+# Normal output
+pgxport -s "SELECT * FROM users" -o users.csv
+
+# Detailed output with timestamps and debug information
+pgxport -s "SELECT * FROM users" -o users.csv --verbose
+```
+
+**Verbose mode shows:**
+- Configuration details (host, port, database)
+- Connection steps and timing
+- Query execution time
+- Export progress (every 10,000 rows)
+- Performance metrics
+
+**Use cases:**
+- 🔍 Debugging connection or query issues
+- 📊 Analyzing export performance
+- 🐛 Troubleshooting errors
+
+**Example output:**
+```bash
+$ pgxport -s "SELECT * FROM users LIMIT 5" -o users.csv -v
+
+[2025-01-15 14:23:45] 🔍 Configuration loaded: host=localhost port=5432 database=mydb
+[2025-01-15 14:23:45] ℹ Connecting to database...
+[2025-01-15 14:23:45] 🔍 Connection established, verifying connectivity (ping)...
+[2025-01-15 14:23:45] ✓ Database connection established
+[2025-01-15 14:23:45] ℹ Executing query...
+[2025-01-15 14:23:45] 🔍 Query: SELECT * FROM users LIMIT 5
+[2025-01-15 14:23:46] 🔍 Query executed successfully in 145ms
+[2025-01-15 14:23:46] 🔍 CSV export completed successfully: 5 rows written in 120ms
+[2025-01-15 14:23:46] ✓ Export completed: 5 rows → users.csv
+```
+
+**Note:** Sensitive information (passwords) is automatically masked in logs.
+
 ## 📊 Output Formats
 
 ### CSV
@@ -563,6 +606,8 @@ pgxport/
 │   ├── json_exporter.go# JSON export implementation
 │   ├── xml_exporter.go # XML export implementation
 │   └── sql_exporter.go # SQL export implementation
+├── logger/             # Logging package
+│   └── logger.go       # Logger interface and implementation
 ├── main.go             # CLI entry point and orchestration
 ├── config.go           # Configuration management with validation
 ├── store.go            # Database operations (connection, queries)
@@ -585,6 +630,8 @@ The project follows a clean, modular architecture with separated concerns:
   - **`json_exporter.go`**: JSON export implementation
   - **`xml_exporter.go`**: XML export implementation
   - **`sql_exporter.go`**: SQL INSERT export implementation
+- **`logger/`**: Logging package with structured output
+  - **`logger.go`**: Logger interface and singleton implementation with debug/verbose support
 - **`store.go`**: Handles all database operations (connect, query, return results)
 - **`main.go`**: Orchestrates the flow between store and exporters
 - **`config.go`**: Manages configuration with validation, defaults, and `.env` file loading
@@ -679,6 +726,8 @@ go build -o pgxport
 5. **Secure your output files**: Be careful with sensitive data in exported files
 
 6. **Review queries**: Always review SQL files before execution
+   
+7. **Verbose mode security**: Remember that `--verbose` logs queries and configuration. Avoid logging sensitive data.
 
 ## 🚨 Error Handling
 
@@ -730,6 +779,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~SQL INSERT export format~~ ✅ Implemented!
 - [x] ~~High-performance CSV export using PostgreSQL COPY~~ ✅ Implemented!
 - [x] ~~Fail-on-empty flag for scripting and automation~~ ✅ Implemented!
+- [x] ~~Verbose mode for debugging~~ ✅ Implemented!
 - [ ] Excel (XLSX) export format
 - [ ] Query pagination for large datasets
 - [ ] Progress bar for long-running queries

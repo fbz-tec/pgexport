@@ -76,7 +76,7 @@ func (l *ConsoleLogger) SetVerbose(enabled bool) {
 }
 
 func (l *ConsoleLogger) timestamp() string {
-	return time.Now().Format("2006-01-02 15:04:05")
+	return time.Now().Format("2006-01-02 15:04:05.000")
 }
 
 func (l *ConsoleLogger) log(out io.Writer, prefix, color, format string, args ...any) {

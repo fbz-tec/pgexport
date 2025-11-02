@@ -426,15 +426,15 @@ pgxport -s "SELECT * FROM users" -o users.csv --verbose
 ```bash
 $ pgxport -s "SELECT * FROM users LIMIT 5" -o users.csv -v
 
-[2025-01-15 14:23:45] 🔍 Configuration loaded: host=localhost port=5432 database=mydb
-[2025-01-15 14:23:45] ℹ Connecting to database...
-[2025-01-15 14:23:45] 🔍 Connection established, verifying connectivity (ping)...
-[2025-01-15 14:23:45] ✓ Database connection established
-[2025-01-15 14:23:45] ℹ Executing query...
-[2025-01-15 14:23:45] 🔍 Query: SELECT * FROM users LIMIT 5
-[2025-01-15 14:23:46] 🔍 Query executed successfully in 145ms
-[2025-01-15 14:23:46] 🔍 CSV export completed successfully: 5 rows written in 120ms
-[2025-01-15 14:23:46] ✓ Export completed: 5 rows → users.csv
+[2025-01-15 14:23:45.258] 🔍 Configuration loaded: host=localhost port=5432 database=mydb
+[2025-01-15 14:23:45.258] ℹ Connecting to database...
+[2025-01-15 14:23:45.307] 🔍 Connection established, verifying connectivity (ping)...
+[2025-01-15 14:23:45.307] ✓ Database connection established
+[2025-01-15 14:23:45.308] ℹ Executing query...
+[2025-01-15 14:23:45.311] 🔍 Query: SELECT * FROM users LIMIT 5
+[2025-01-15 14:23:46.314] 🔍 Query executed successfully in 145ms
+[2025-01-15 14:23:46.315] 🔍 CSV export completed successfully: 5 rows written in 120ms
+[2025-01-15 14:23:46.315] ✓ Export completed: 5 rows → users.csv
 ```
 
 **Note:** Sensitive information (passwords) is automatically masked in logs.

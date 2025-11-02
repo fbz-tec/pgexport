@@ -5,12 +5,20 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"strings"
+	"time"
 
+	"github.com/fbz-tec/pgexport/logger"
 	"github.com/jackc/pgx/v5"
 )
 
 // exportToCSV writes query results to a CSV file with buffered I/O
 func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOptions) (int, error) {
+	start := time.Now()
+
+	logger.Debug("Preparing CSV export (delimiter=%q, noHeader=%v, compression=%s)",
+		string(options.Delimiter), options.NoHeader, options.Compression)
+
 	writerCloser, err := createOutputWriter(csvPath, options, FormatCSV)
 	if err != nil {
 		return 0, err
@@ -37,13 +45,17 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		if err := writer.Write(headers); err != nil {
 			return 0, fmt.Errorf("error writing headers: %w", err)
 		}
+		logger.Debug("CSV headers written: %s", strings.Join(headers, string(options.Delimiter)))
 	}
 
 	//datetime layout(Golang format) and timezone
 	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	// Write data rows
+	logger.Debug("Starting to write CSV rows...")
+
 	rowCount := 0
+
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
@@ -62,6 +74,7 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		}
 
 		if rowCount%10000 == 0 {
+			logger.Debug("%d rows written...", rowCount)
 			writer.Flush()
 		}
 
@@ -71,10 +84,23 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		return rowCount, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	logger.Debug("Flushing CSV buffers to disk...")
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		return rowCount, fmt.Errorf("error flushing CSV: %w", err)
+	}
+
+	logger.Debug("CSV export completed successfully: %d rows written in %v", rowCount, time.Since(start))
+
 	return rowCount, nil
 }
 
 func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string, options ExportOptions) (int, error) {
+
+	start := time.Now()
+	logger.Debug("Starting PostgreSQL COPY export (noHeader=%v, compression=%s)", options.NoHeader, options.Compression)
+
 	writerCloser, err := createOutputWriter(csvPath, options, FormatCSV)
 	if err != nil {
 		return 0, err
@@ -89,6 +115,9 @@ func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string
 		return 0, fmt.Errorf("COPY TO STDOUT failed: %w", err)
 	}
 
-	return int(tag.RowsAffected()), nil
+	rowCount := int(tag.RowsAffected())
+	logger.Debug("COPY export completed successfully: %d rows written in %v", rowCount, time.Since(start))
+
+	return rowCount, nil
 
 }

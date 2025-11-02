@@ -4,12 +4,18 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/fbz-tec/pgexport/logger"
 	"github.com/jackc/pgx/v5"
 )
 
 // exportToJSON writes query results to a JSON file with buffered I/O
 func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportOptions) (int, error) {
+
+	start := time.Now()
+	logger.Debug("Preparing JSON export (indent=2 spaces, compression=%s)", options.Compression)
+
 	writeCloser, err := createOutputWriter(jsonPath, options, FormatJSON)
 	if err != nil {
 		return 0, err
@@ -42,6 +48,8 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 
 	rowCount := 0
 
+	logger.Debug("Starting to write JSON objects...")
+
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
@@ -67,6 +75,7 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 
 		if rowCount%10000 == 0 {
 			bufferedWriter.Flush()
+			logger.Debug("%d JSON objects written...", rowCount)
 		}
 	}
 
@@ -77,6 +86,8 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 	if _, err := bufferedWriter.WriteString("]\n"); err != nil {
 		return 0, fmt.Errorf("error writing end of JSON array: %w", err)
 	}
+
+	logger.Debug("JSON export completed successfully: %d rows written in %v", rowCount, time.Since(start))
 
 	return rowCount, nil
 }

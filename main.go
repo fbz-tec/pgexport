@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/fbz-tec/pgexport/exporters"
+	"github.com/fbz-tec/pgexport/logger"
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 )
 
@@ -25,11 +26,10 @@ var (
 	withCopy    bool
 	failOnEmpty bool
 	noHeader    bool
+	verbose     bool
 )
 
 func main() {
-
-	log.SetFlags(log.Ldate | log.Ltime)
 
 	var rootCmd = &cobra.Command{
 		Use:   "pgxport",
@@ -85,43 +85,69 @@ Supported output formats:
 	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
 	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVar(&noHeader, "no-header", false, "Skip header row in CSV output")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 
 	rootCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(versionCmd)
 
+	// Appliquer le flag verbose avant l’exécution de la commande
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		logger.SetVerbose(verbose)
+		if verbose {
+			logger.Debug("Verbose mode enabled")
+		}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
 }
 
 func runExport(cmd *cobra.Command, args []string) error {
+
+	logger.Debug("Initializing pgxport execution environment")
+	logger.Debug("Version: %s, Build: %s, Commit: %s", Version, BuildTime, GitCommit)
+
+	logger.Debug("Validating export parameters")
+
 	if err := validateExportParams(); err != nil {
 		return err
 	}
 
+	logger.Debug("Export parameters validated successfully")
+
 	var dbUrl string
 	if connString != "" {
+		logger.Debug("Using connection string from --dsn flag")
 		dbUrl = connString
 	} else {
+		logger.Debug("Loading configuration from environment")
 		config := LoadConfig()
 		if err := config.Validate(); err != nil {
 			return fmt.Errorf("configuration error: %w", err)
 		}
 		dbUrl = config.GetConnectionString()
+		logger.Debug("Configuration loaded: host=%s port=%s database=%s user=%s",
+			config.DBHost, config.DBPort, config.DBName, config.DBUser)
 	}
 
 	var query string
 	var err error
+	var rowCount int
+	var rows pgx.Rows
 
 	if sqlFile != "" {
+		logger.Debug("Reading SQL from file: %s", sqlFile)
 		query, err = readSQLFromFile(sqlFile)
 		if err != nil {
 			return fmt.Errorf("error reading SQL file: %w", err)
 		}
+		logger.Debug("SQL query loaded from file (%d characters)", len(query))
 	} else {
 		query = sqlQuery
+		logger.Debug("Using inline SQL query (%d characters)", len(query))
 	}
 
 	format = strings.ToLower(strings.TrimSpace(format))
@@ -132,12 +158,15 @@ func runExport(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid delimiter: %w", err)
 		}
+		logger.Debug("CSV delimiter: %q", string(delimRune))
 	}
 
 	store := NewStore()
+
 	if err := store.Open(dbUrl); err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
+
 	defer store.Close()
 
 	options := exporters.ExportOptions{
@@ -150,31 +179,20 @@ func runExport(cmd *cobra.Command, args []string) error {
 		NoHeader:    noHeader,
 	}
 
-	log.Println("Executing query...")
-
 	if format == "csv" && withCopy {
-
-		log.Println("Using PostgreSQL native COPY mode for CSV export...")
+		logger.Debug("Using PostgreSQL COPY mode for fast CSV export")
 		exporter := exporters.NewCopyExporter()
-
-		rowCount, err := exporter.ExportCopy(store.GetConnection(), query, outputPath, options)
-
+		rowCount, err = exporter.ExportCopy(store.GetConnection(), query, outputPath, options)
+	} else {
+		logger.Debug("Using standard export mode for format: %s", format)
+		rows, err = store.ExecuteQuery(context.Background(), query)
 		if err != nil {
-			return fmt.Errorf("error exporting to %s: %w", options.Format, err)
+			return fmt.Errorf("query execution failed: %w", err)
 		}
-
-		return handleExportResult(rowCount, outputPath)
+		defer rows.Close()
+		exporter := exporters.NewExporter()
+		rowCount, err = exporter.Export(rows, outputPath, options)
 	}
-
-	rows, err := store.ExecuteQuery(context.Background(), query)
-	if err != nil {
-		return fmt.Errorf("query execution failed: %w", err)
-	}
-	defer rows.Close()
-
-	exporter := exporters.NewExporter()
-
-	rowCount, err := exporter.Export(rows, outputPath, options)
 
 	if err != nil {
 		return fmt.Errorf("export failed: %w", err)
@@ -186,11 +204,11 @@ func runExport(cmd *cobra.Command, args []string) error {
 func validateExportParams() error {
 	// Validate SQL query source
 	if sqlQuery == "" && sqlFile == "" {
-		return fmt.Errorf("Error: Either --sql or --sqlfile must be provided")
+		return fmt.Errorf("error: Either --sql or --sqlfile must be provided")
 	}
 
 	if sqlQuery != "" && sqlFile != "" {
-		return fmt.Errorf("Error: Cannot use both --sql and --sqlfile at the same time")
+		return fmt.Errorf("error: Cannot use both --sql and --sqlfile at the same time")
 	}
 
 	// Normalize and validate format
@@ -206,7 +224,7 @@ func validateExportParams() error {
 	}
 
 	if !isValid {
-		return fmt.Errorf("Error: Invalid format '%s'. Valid formats are: %s",
+		return fmt.Errorf("error: Invalid format '%s'. Valid formats are: %s",
 			format, strings.Join(validFormats, ", "))
 	}
 
@@ -224,26 +242,26 @@ func validateExportParams() error {
 	}
 
 	if !compressionValid {
-		return fmt.Errorf("Error: Invalid compression '%s'. Valid options are: %s",
+		return fmt.Errorf("error: Invalid compression '%s'. Valid options are: %s",
 			compression, strings.Join(validCompressions, ", "))
 	}
 
 	// Validate table name for SQL format
 	if format == "sql" && strings.TrimSpace(tableName) == "" {
-		return fmt.Errorf("Error: --table (-t) is required when using SQL format")
+		return fmt.Errorf("error: --table (-t) is required when using SQL format")
 	}
 
 	// Validate time format if provided
 	if timeFormat != "" {
 		if err := exporters.ValidateTimeFormat(timeFormat); err != nil {
-			return fmt.Errorf("Error: Invalid time format '%s'. Use format like 'yyyy-MM-dd HH:mm:ss'", timeFormat)
+			return fmt.Errorf("error: Invalid time format '%s'. Use format like 'yyyy-MM-dd HH:mm:ss'", timeFormat)
 		}
 	}
 
 	// Validate timezone if provided
 	if timeZone != "" {
 		if err := exporters.ValidateTimeZone(timeZone); err != nil {
-			return fmt.Errorf("Error: Invalid timezone '%s'. Use format like 'UTC' or 'Europe/Paris'", timeZone)
+			return fmt.Errorf("error: Invalid timezone '%s'. Use format like 'UTC' or 'Europe/Paris'", timeZone)
 		}
 	}
 
@@ -285,10 +303,10 @@ func handleExportResult(rowCount int, outputPath string) error {
 			return fmt.Errorf("export failed: query returned 0 rows")
 		}
 
-		log.Printf("Warning: Query returned 0 rows. File created at %s but contains no data rows.", outputPath)
+		logger.Warn("Query returned 0 rows. File created at %s but contains no data rows", outputPath)
 
 	} else {
-		log.Printf("Successfully exported %d rows to %s", rowCount, outputPath)
+		logger.Success("Export completed: %d rows -> %s", rowCount, outputPath)
 	}
 
 	return nil

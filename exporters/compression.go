@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/fbz-tec/pgexport/logger"
 )
 
 const (
@@ -30,10 +33,11 @@ func (c *compositeWriteCloser) Close() error {
 }
 
 func createOutputWriter(path string, options ExportOptions, format string) (io.WriteCloser, error) {
+	start := time.Now()
 	compression := strings.ToLower(strings.TrimSpace(options.Compression))
-
 	switch compression {
 	case None:
+		logger.Debug("Creating uncompressed output file: %s", path)
 		file, err := os.Create(path)
 		if err != nil {
 			return nil, fmt.Errorf("error creating file: %w", err)
@@ -44,6 +48,7 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 		if !strings.HasSuffix(strings.ToLower(path), ".gz") {
 			path += ".gz"
 		}
+		logger.Debug("Creating gzip-compressed output file: %s", path)
 		file, err := os.Create(path)
 		if err != nil {
 			return nil, fmt.Errorf("error creating file: %w", err)
@@ -52,6 +57,7 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 		return &compositeWriteCloser{
 			Writer: gzipWriter,
 			closeFunc: func() error {
+				logger.Debug("Finalizing gzip compression for: %s", path)
 				var err error
 				if cerr := gzipWriter.Close(); cerr != nil {
 					err = cerr
@@ -59,6 +65,7 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 				if ferr := file.Close(); ferr != nil && err == nil {
 					err = ferr
 				}
+				logger.Debug("GZIP file closed successfully in %v", time.Since(start))
 				return err
 			},
 		}, nil
@@ -67,12 +74,14 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 		if !strings.HasSuffix(strings.ToLower(path), ".zip") {
 			path += ".zip"
 		}
+		logger.Debug("Creating zip-compressed output file: %s", path)
 		file, err := os.Create(path)
 		if err != nil {
 			return nil, fmt.Errorf("error creating file: %w", err)
 		}
 		zipWriter := zip.NewWriter(file)
 		entryName := determineZipEntryName(path, format)
+		logger.Debug("Creating zip entry: %s", entryName)
 		entryWriter, err := zipWriter.Create(entryName)
 		if err != nil {
 			zipWriter.Close()
@@ -82,6 +91,7 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 		return &compositeWriteCloser{
 			Writer: entryWriter,
 			closeFunc: func() error {
+				logger.Debug("Finalizing zip archive: %s", path)
 				var err error
 				if cerr := zipWriter.Close(); cerr != nil {
 					err = cerr
@@ -89,6 +99,7 @@ func createOutputWriter(path string, options ExportOptions, format string) (io.W
 				if ferr := file.Close(); ferr != nil && err == nil {
 					err = ferr
 				}
+				logger.Debug("ZIP file closed successfully in %v", time.Since(start))
 				return err
 			},
 		}, nil

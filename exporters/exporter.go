@@ -3,6 +3,7 @@ package exporters
 import (
 	"fmt"
 
+	"github.com/fbz-tec/pgexport/logger"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -49,6 +50,8 @@ func NewCopyExporter() CopyCapable {
 // Export exports query results to the specified format
 func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOptions) (int, error) {
 
+	logger.Debug("Starting export to %s format → output: %s", options.Format, outputPath)
+
 	var rowCount int
 	var err error
 
@@ -73,6 +76,9 @@ func (e *dataExporter) Export(rows pgx.Rows, outputPath string, options ExportOp
 }
 
 func (e *dataExporter) ExportCopy(conn *pgx.Conn, query string, outputPath string, options ExportOptions) (int, error) {
+
+	logger.Debug("Starting COPY export for %s format → output: %s", options.Format, outputPath)
+
 	var rowCount int
 	var err error
 	switch options.Format {

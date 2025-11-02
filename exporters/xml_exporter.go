@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"encoding/xml"
 	"fmt"
+	"time"
 
+	"github.com/fbz-tec/pgexport/logger"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,6 +17,10 @@ const (
 
 // exportToXML writes query results to an XML file with buffered I/O
 func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
+
+	start := time.Now()
+	logger.Debug("Preparing XML export (indent=2 spaces, compression=%s)", options.Compression)
+
 	writeCloser, err := createOutputWriter(xmlPath, options, FormatXML)
 	if err != nil {
 		return 0, err
@@ -34,6 +40,8 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 		return 0, fmt.Errorf("error writing XML header: %w", err)
 	}
 
+	logger.Debug("XML header written")
+
 	startResults := xml.StartElement{Name: xml.Name{Local: XmlRootElement}}
 	if err := encoder.EncodeToken(startResults); err != nil {
 		return 0, fmt.Errorf("error starting <%s>: %w", XmlRootElement, err)
@@ -50,6 +58,9 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
+
+	logger.Debug("Starting to write XML rows...")
+
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
@@ -87,6 +98,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 		if rowCount%10000 == 0 {
 			bufferedWriter.Flush()
+			logger.Debug("%d XML rows written...", rowCount)
 		}
 
 	}
@@ -103,6 +115,8 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 	if _, err := bufferedWriter.WriteString("\n"); err != nil {
 		return 0, fmt.Errorf("error writing final newline: %w", err)
 	}
+
+	logger.Debug("XML export completed successfully: %d rows written in %v", rowCount, time.Since(start))
 
 	return rowCount, nil
 }

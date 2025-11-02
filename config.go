@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -30,11 +29,9 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	if err := godotenv.Load(); err != nil {
-		if !os.IsNotExist(err) {
-			log.Printf("Warning: Error loading .env file: %v", err)
-		}
-	}
+
+	_ = godotenv.Load()
+
 	return Config{
 		DBDriver: getEnvOrDefault("DB_DRIVER", DefaultDBDriver),
 		DBUser:   getEnvOrDefault("DB_USER", DefaultDBUser),
@@ -62,10 +59,6 @@ func (c Config) Validate() error {
 
 	if strings.TrimSpace(c.DBUser) == "" {
 		return fmt.Errorf("DB_USER cannot be empty or contain only whitespace")
-	}
-
-	if c.DBPass == "" {
-		log.Println("Warning: DB_PASS is empty. Connection might fail if password authentication is required.")
 	}
 
 	return nil

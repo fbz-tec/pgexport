@@ -4,11 +4,17 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/fbz-tec/pgexport/logger"
 	"github.com/jackc/pgx/v5"
 )
 
 func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOptions) (int, error) {
+
+	start := time.Now()
+	logger.Debug("Preparing SQL export (table=%s, compression=%s)", options.TableName, options.Compression)
+
 	writeCloser, err := createOutputWriter(sqlPath, options, FormatSQL)
 	if err != nil {
 		return 0, err
@@ -27,6 +33,8 @@ func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOpt
 		columns[i] = quoteIdent(fd.Name)
 	}
 	size := len(columns)
+
+	logger.Debug("Starting to write SQL INSERT statements...")
 
 	for rows.Next() {
 		record := make([]string, size)
@@ -51,12 +59,18 @@ func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOpt
 
 		if rowCount%10000 == 0 {
 			bufferedWriter.Flush()
+			logger.Debug("%d INSERT statements written...", rowCount)
 		}
 	}
+
+	logger.Debug("Flushing remaining SQL statements to disk...")
+	bufferedWriter.Flush()
 
 	if err := rows.Err(); err != nil {
 		return rowCount, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	logger.Debug("SQL export completed successfully: %d rows written in %v", rowCount, time.Since(start))
 
 	return rowCount, nil
 }

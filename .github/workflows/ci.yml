@@ -127,9 +127,83 @@ jobs:
       - name: 🏗️ Build release binaries
         run: |
           mkdir dist
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-linux-amd64
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-windows-amd64.exe
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o dist/pgxport-macos-amd64
+          VERSION="${{ github.ref_name }}"
+          BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          LDFLAGS="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}"
+
+          echo "Building binaries for version ${VERSION}..."
+
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-linux-amd64
+
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-linux-arm64
+          
+          # macOS AMD64 (Intel)
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-darwin-amd64
+          
+          # macOS ARM64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-darwin-arm64
+          
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-windows-amd64.exe
+          
+          # Windows ARM64
+          GOOS=windows GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/pgxport-windows-arm64.exe
+          
+          echo "✅ All binaries built successfully"
+
+      - name: 📦 Create platform-specific archives with documentation
+        run: |
+          # Prepare files to include in all archives
+          cp CHANGELOG.md dist/ 2>/dev/null || echo "⚠️  CHANGELOG.md not found"
+          cp README.md dist/ 2>/dev/null || echo "⚠️  README.md not found"
+          cp LICENSE dist/ 2>/dev/null || echo "⚠️  LICENSE not found"
+          
+          cd dist
+          
+          echo "📦 Creating platform-specific archives..."
+          
+          # Linux AMD64 - tar.gz
+          tar -czf pgxport-linux-amd64.tar.gz pgxport-linux-amd64 CHANGELOG.md README.md LICENSE
+          rm pgxport-linux-amd64
+          
+          # Linux ARM64 - tar.gz
+          tar -czf pgxport-linux-arm64.tar.gz pgxport-linux-arm64 CHANGELOG.md README.md LICENSE
+          rm pgxport-linux-arm64
+          
+          # macOS AMD64 - tar.gz
+          tar -czf pgxport-darwin-amd64.tar.gz pgxport-darwin-amd64 CHANGELOG.md README.md LICENSE
+          rm pgxport-darwin-amd64
+          
+          # macOS ARM64 - tar.gz
+          tar -czf pgxport-darwin-arm64.tar.gz pgxport-darwin-arm64 CHANGELOG.md README.md LICENSE
+          rm pgxport-darwin-arm64
+          
+          # Windows AMD64 - zip
+          zip -j pgxport-windows-amd64.zip pgxport-windows-amd64.exe CHANGELOG.md README.md LICENSE
+          rm pgxport-windows-amd64.exe
+          
+          # Windows ARM64 - zip
+          zip -j pgxport-windows-arm64.zip pgxport-windows-arm64.exe CHANGELOG.md README.md LICENSE
+          rm pgxport-windows-arm64.exe
+          
+          # Cleanup docs
+          rm -f CHANGELOG.md README.md LICENSE
+          
+          echo ""
+          echo "✅ Archives created:"
+          ls -lh *.tar.gz *.zip
+
+      - name: 📄 Create source code archive
+        run: |
+          VERSION="${{ github.ref_name }}"
+          
+          # Create source archive (excluding .git, dist, build artifacts)
+          git archive --format=zip --prefix=pgxport-${VERSION}-src/ HEAD -o dist/pgxport-${VERSION}-src.zip
+          
+          echo "✅ Source code archive created: pgxport-${VERSION}-src.zip"
 
       - name: 🧮 Generate checksums
         run: |
@@ -143,6 +217,37 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: dist/*
+          body: |
+            # pgxport ${{ github.ref_name }}
+            
+            ## 📦 Downloads
+            
+            ### Binary Releases
+            
+            | Platform | Architecture | Download |
+            |----------|-------------|----------|
+            | Linux | x86_64 (AMD64) | `pgxport-linux-amd64.tar.gz` |
+            | Linux | ARM64 | `pgxport-linux-arm64.tar.gz` |
+            | macOS | Intel (AMD64) | `pgxport-darwin-amd64.tar.gz` |
+            | macOS | Apple Silicon (ARM64) | `pgxport-darwin-arm64.tar.gz` |
+            | Windows | x86_64 (AMD64) | `pgxport-windows-amd64.zip` |
+            | Windows | ARM64 | `pgxport-windows-arm64.zip` |
+            
+            Each archive contains: binary + CHANGELOG + README + LICENSE
+            
+            ### Source Code
+            
+            - `pgxport-${{ github.ref_name }}-src.zip` - Custom source archive
+            - GitHub also provides auto-generated source archives below
+            
+            ## 📚 Documentation
+            
+            - **Installation & Usage**: See [README.md](https://github.com/fbz-tec/pgxport#readme)
+            - **What's New**: See [CHANGELOG.md](https://github.com/fbz-tec/pgxport/blob/${{ github.ref_name }}/CHANGELOG.md)
+            - **Verify downloads**: Check `checksums.txt` (SHA256)
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

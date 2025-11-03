@@ -142,6 +142,8 @@ pgxport [command] [flags]
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
 | `--no-header` | - | Skip CSV header row in output | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
+| `--xml-root-tag` | - | Sets the root XML element name | `results` | No |
+| `--xml-row-tag` | - | Sets the row XML element name | `row` | No |
 | `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
@@ -176,6 +178,9 @@ pgxport -s "SELECT * FROM products" -o products.json -f json
 
 # Export to XML format
 pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
+
+# Export to XML format with custom root and row tags
+pgxport -s "SELECT * FROM orders" -o orders.xml -f xml --xml-root-tag="data" --xml-row-tag="record"
 
 # Export to SQL INSERT statements
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
@@ -528,7 +533,10 @@ Date and timestamp formats may differ from standard csv export.
 ### XML
 
 - Pretty-printed with 2-space indentation
-- Structured with `<results>` root and `<row>` elements
+- **Customizable tags** using:
+  - `--xml-root-tag` (default: `results`)
+  - `--xml-row-tag` (default: `row`)
+- Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
 - Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
 - **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
 - **Timezone**: Local system time (customizable with `--time-zone`)

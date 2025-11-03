@@ -19,6 +19,7 @@ type Logger interface {
 	Error(format string, args ...any)
 	SetOutput(out io.Writer)
 	SetVerbose(enabled bool)
+	IsVerbose() bool
 }
 
 // ConsoleLogger implements the Logger interface
@@ -54,6 +55,10 @@ func SetVerbose(verbose bool) {
 	GetLogger().SetVerbose(verbose)
 }
 
+func IsVerbose() bool {
+	return GetLogger().IsVerbose()
+}
+
 // Global helper functions for convenience
 func Info(format string, args ...any)    { GetLogger().Info(format, args...) }
 func Debug(format string, args ...any)   { GetLogger().Debug(format, args...) }
@@ -73,6 +78,10 @@ func (l *ConsoleLogger) SetVerbose(enabled bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.verboseMode = enabled
+}
+
+func (l *ConsoleLogger) IsVerbose() bool {
+	return l.verboseMode
 }
 
 func (l *ConsoleLogger) timestamp() string {

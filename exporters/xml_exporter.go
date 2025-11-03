@@ -10,11 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const (
-	XmlRootElement = "results"
-	XmlRowElement  = "row"
-)
-
 // exportToXML writes query results to an XML file with buffered I/O
 func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
 
@@ -42,9 +37,9 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 	logger.Debug("XML header written")
 
-	startResults := xml.StartElement{Name: xml.Name{Local: XmlRootElement}}
+	startResults := xml.StartElement{Name: xml.Name{Local: options.XmlRootElement}}
 	if err := encoder.EncodeToken(startResults); err != nil {
-		return 0, fmt.Errorf("error starting <%s>: %w", XmlRootElement, err)
+		return 0, fmt.Errorf("error starting <%s>: %w", options.XmlRootElement, err)
 	}
 
 	// get fields names
@@ -67,10 +62,10 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 			return 0, fmt.Errorf("error reading row: %w", err)
 		}
 
-		startRow := xml.StartElement{Name: xml.Name{Local: XmlRowElement}}
+		startRow := xml.StartElement{Name: xml.Name{Local: options.XmlRowElement}}
 
 		if err := encoder.EncodeToken(startRow); err != nil {
-			return rowCount, fmt.Errorf("error starting <%s>: %w", XmlRowElement, err)
+			return rowCount, fmt.Errorf("error starting <%s>: %w", options.XmlRowElement, err)
 		}
 
 		for i, field := range fields {
@@ -91,7 +86,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 
 		// End </row>
 		if err := encoder.EncodeToken(xml.EndElement{Name: startRow.Name}); err != nil {
-			return rowCount, fmt.Errorf("error closing </%s>: %w", XmlRowElement, err)
+			return rowCount, fmt.Errorf("error closing </%s>: %w", options.XmlRowElement, err)
 		}
 
 		rowCount++
@@ -108,7 +103,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 	}
 
 	if err := encoder.EncodeToken(xml.EndElement{Name: startResults.Name}); err != nil {
-		return 0, fmt.Errorf("error ending </%s>: %w", XmlRootElement, err)
+		return 0, fmt.Errorf("error ending </%s>: %w", options.XmlRootElement, err)
 	}
 
 	// Add final newline

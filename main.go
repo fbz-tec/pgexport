@@ -13,20 +13,22 @@ import (
 )
 
 var (
-	sqlQuery    string
-	sqlFile     string
-	outputPath  string
-	format      string
-	delimiter   string
-	connString  string
-	tableName   string
-	compression string
-	timeFormat  string
-	timeZone    string
-	withCopy    bool
-	failOnEmpty bool
-	noHeader    bool
-	verbose     bool
+	sqlQuery       string
+	sqlFile        string
+	outputPath     string
+	format         string
+	delimiter      string
+	connString     string
+	tableName      string
+	compression    string
+	timeFormat     string
+	timeZone       string
+	xmlRootElement string
+	xmlRowElement  string
+	withCopy       bool
+	failOnEmpty    bool
+	noHeader       bool
+	verbose        bool
 )
 
 func main() {
@@ -85,6 +87,8 @@ Supported output formats:
 	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
 	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVar(&noHeader, "no-header", false, "Skip header row in CSV output")
+	rootCmd.Flags().StringVarP(&xmlRootElement, "xml-root-tag", "", "results", "Sets the root element name for XML exports")
+	rootCmd.Flags().StringVarP(&xmlRowElement, "xml-row-tag", "", "row", "Sets the row element name for XML exports")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 
 	rootCmd.MarkFlagRequired("output")
@@ -170,13 +174,15 @@ func runExport(cmd *cobra.Command, args []string) error {
 	defer store.Close()
 
 	options := exporters.ExportOptions{
-		Format:      format,
-		Delimiter:   delimRune,
-		TableName:   tableName,
-		Compression: compression,
-		TimeFormat:  timeFormat,
-		TimeZone:    timeZone,
-		NoHeader:    noHeader,
+		Format:         format,
+		Delimiter:      delimRune,
+		TableName:      tableName,
+		Compression:    compression,
+		TimeFormat:     timeFormat,
+		TimeZone:       timeZone,
+		NoHeader:       noHeader,
+		XmlRootElement: xmlRootElement,
+		XmlRowElement:  xmlRowElement,
 	}
 
 	if format == "csv" && withCopy {

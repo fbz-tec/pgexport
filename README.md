@@ -417,6 +417,11 @@ pgxport -s "SELECT * FROM users" -o users.csv --verbose
 - Export progress (every 10,000 rows)
 - Performance metrics
 
+**Additional diagnostics (CSV format only):**
+- Tracks average row fetch time and overall throughput (rows/s)
+- Detects slow PostgreSQL streaming when queries stream data gradually
+- Displays a performance summary at the end of the export
+
 **Use cases:**
 - 🔍 Debugging connection or query issues
 - 📊 Analyzing export performance

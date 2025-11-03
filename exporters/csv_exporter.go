@@ -55,8 +55,18 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 	logger.Debug("Starting to write CSV rows...")
 
 	rowCount := 0
+	lastLog := time.Now()
+	var fetchTime time.Duration // Track time spent waiting for rows from PostgreSQL
 
-	for rows.Next() {
+	for {
+		fetchStart := time.Now()
+		hasNext := rows.Next()
+		fetchTime += time.Since(fetchStart)
+
+		if !hasNext {
+			break
+		}
+
 		values, err := rows.Values()
 		if err != nil {
 			return rowCount, fmt.Errorf("error reading row: %w", err)
@@ -73,11 +83,17 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 			return 0, fmt.Errorf("error writing row %d: %w", rowCount, err)
 		}
 
-		if rowCount%10000 == 0 {
-			logger.Debug("%d rows written...", rowCount)
-			writer.Flush()
-		}
+		if logger.IsVerbose() && (rowCount%10000 == 0 || time.Since(lastLog) > 2*time.Second) {
+			elapsed := time.Since(start)
+			rowsPerSec := float64(rowCount) / elapsed.Seconds()
+			avgFetchMs := float64(fetchTime.Milliseconds()) / float64(rowCount)
 
+			logger.Debug("%d rows written (%.0f rows/s, elapsed %v, avg fetch=%.2fms/row)",
+				rowCount, rowsPerSec, elapsed.Truncate(100*time.Millisecond), avgFetchMs)
+
+			writer.Flush()
+			lastLog = time.Now()
+		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -91,7 +107,21 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		return rowCount, fmt.Errorf("error flushing CSV: %w", err)
 	}
 
-	logger.Debug("CSV export completed successfully: %d rows written in %v", rowCount, time.Since(start))
+	elapsed := time.Since(start)
+	logger.Debug("CSV export completed successfully: %d rows written in %v (%.0f rows/s)",
+		rowCount, elapsed.Round(time.Millisecond), float64(rowCount)/elapsed.Seconds())
+
+	// Detect slow streaming and suggest COPY mode
+	if logger.IsVerbose() && rowCount > 1000 {
+		avgFetchMs := float64(fetchTime.Milliseconds()) / float64(rowCount)
+		fetchPercent := (fetchTime.Seconds() / elapsed.Seconds()) * 100
+
+		// If average fetch time > 5ms per row OR fetch time > 70% of total time, suggest COPY mode
+		if avgFetchMs > 5.0 || fetchPercent > 70 {
+			logger.Warn("Slow row streaming detected (%.1fms/row, %.0f%% fetch time)", avgFetchMs, fetchPercent)
+			logger.Info("For better performance, use --with-copy flag (PostgreSQL COPY is 10-100x faster)")
+		}
+	}
 
 	return rowCount, nil
 }

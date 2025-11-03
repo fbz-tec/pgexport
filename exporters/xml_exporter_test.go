@@ -182,10 +182,12 @@ func TestWriteXML(t *testing.T) {
 
 			exporter := &dataExporter{}
 			options := ExportOptions{
-				Format:      FormatXML,
-				Compression: tt.compression,
-				TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-				TimeZone:    "",
+				Format:         FormatXML,
+				Compression:    tt.compression,
+				TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+				TimeZone:       "",
+				XmlRootElement: "results",
+				XmlRowElement:  "row",
 			}
 
 			_, err = exporter.writeXML(rows, outputPath, options)
@@ -264,10 +266,12 @@ func TestWriteXMLTimeFormatting(t *testing.T) {
 
 			exporter := &dataExporter{}
 			options := ExportOptions{
-				Format:      FormatXML,
-				Compression: "none",
-				TimeFormat:  tt.timeFormat,
-				TimeZone:    tt.timeZone,
+				Format:         FormatXML,
+				Compression:    "none",
+				TimeFormat:     tt.timeFormat,
+				TimeZone:       tt.timeZone,
+				XmlRootElement: "results",
+				XmlRowElement:  "row",
 			}
 
 			_, err = exporter.writeXML(rows, outputPath, options)
@@ -312,10 +316,12 @@ func TestWriteXMLDataTypes(t *testing.T) {
 
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	rowCount, err := exporter.writeXML(rows, outputPath, options)
@@ -360,10 +366,12 @@ func TestWriteXMLStructure(t *testing.T) {
 
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	_, err = exporter.writeXML(rows, outputPath, options)
@@ -414,10 +422,12 @@ func TestWriteXMLValidXML(t *testing.T) {
 
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	_, err = exporter.writeXML(rows, outputPath, options)
@@ -528,10 +538,12 @@ func TestWriteXMLLargeDataset(t *testing.T) {
 
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	start := time.Now()
@@ -594,10 +606,12 @@ func TestWriteXMLSpecialXMLCharacters(t *testing.T) {
 
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	_, err = exporter.writeXML(rows, outputPath, options)
@@ -634,10 +648,12 @@ func BenchmarkWriteXML(b *testing.B) {
 	tmpDir := b.TempDir()
 	exporter := &dataExporter{}
 	options := ExportOptions{
-		Format:      FormatXML,
-		Compression: "none",
-		TimeFormat:  "yyyy-MM-dd HH:mm:ss",
-		TimeZone:    "",
+		Format:         FormatXML,
+		Compression:    "none",
+		TimeFormat:     "yyyy-MM-dd HH:mm:ss",
+		TimeZone:       "",
+		XmlRootElement: "results",
+		XmlRowElement:  "row",
 	}
 
 	b.ResetTimer()

@@ -20,6 +20,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - ⚠️ Optional fail-on-empty mode (`--fail-on-empty`) for scripting and automation
 - 🔍 Verbose mode (`--verbose`) with detailed debug information
 - ⚡ Optimized for performance with buffered I/O
+- 🔄 Batch INSERT statements for SQL exports (`--insert-batch`) for improved import performance
 - 🗃️ Clean architecture with separated concerns
 - 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
 
@@ -146,6 +147,7 @@ pgxport [command] [flags]
 | `--xml-row-tag` | - | Sets the row XML element name | `row` | No |
 | `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
+| `--insert-batch` | - | Number of rows per INSERT statement for SQL exports | `1` | No |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | - | Database connection string | - | No |
 | `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
@@ -193,6 +195,10 @@ pgxport -s "SELECT * FROM users" -o users.sql -f sql -t backup.users
 
 # Complex schema names with special characters
 pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "my-schema"."my-table"
+
+# Export with batch INSERT statements (100 rows per INSERT)
+pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders --insert-batch 100
+
 
 # Export with gzip compression
 pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
@@ -567,12 +573,19 @@ Date and timestamp formats may differ from standard csv export.
 - INSERT statements format for easy data migration
 - Buffered I/O for optimal performance
 - **Requires `--table` / `-t` parameter to specify target table name**
+- **Batch INSERT support** with `--insert-batch` flag for improved import performance
 
 **Example output:**
 ```sql
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
+
+# batch insert
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
+	(1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000'),
+	(2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000'),
+	(3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
 
 # Export to a table in a specific schema
 pgxport -s "SELECT * FROM users" -o users.sql -f sql -t public.users
@@ -583,6 +596,8 @@ pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t backup.orders
 # Schema or table names with special characters
 pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "\"my-schema\".\"my-table\""
 
+# Export from file to SQL with optimized batch size
+pgxport -F query.sql -o output.sql -f sql --table target_table --insert-batch 500
 ```
 
 **Usage example:**
@@ -596,10 +611,17 @@ pgxport -F query.sql -o output.sql -f sql --table target_table
 # Complex data types (numbers, booleans, NULL, dates)
 pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
         -o products.sql -f sql -t products_backup
+
+# Export from file to SQL with optimized batch size
+pgxport -F query.sql -o output.sql -f sql --table target_table --insert-batch 500
+
+# Export to a table in a specific schema with batch INSERT
+pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t backup.orders --insert-batch 250        
 ```
 
 **SQL Format Features:**
 - ✅ **Schema-qualified table names**: Supports `schema.table` notation for cross-schema exports
+- ✅ **Batch INSERT support**: Use `--insert-batch` to group multiple rows in a single INSERT statement for significantly faster imports
 - ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL, bytea
 - ✅ **Automatic escaping**: Single quotes in strings are properly escaped (e.g., `O'Brien` → `'O''Brien'`)
 - ✅ **Identifier quoting**: Properly quotes table and column names to handle special characters
@@ -800,7 +822,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] ~~Streaming mode for huge datasets~~ ✅ Implemented!
 - [x] ~~Compression support (gzip, zip)~~ ✅ Implemented!
 - [x] ~~SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`~~ ✅ Implemented!
-- [ ] Batch INSERT statements for better performance
+- [x] ~~Batch INSERT statements for better performance~~ ✅ Implemented!
 
 ## 💬 Support
 

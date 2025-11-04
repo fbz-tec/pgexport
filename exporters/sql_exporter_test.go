@@ -571,21 +571,37 @@ func TestWriteSQLStatementFormat(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
-	lines := strings.Split(string(content), "\n")
+	contentStr := string(content)
 
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
+	// Verify multi-row INSERT format is used
+	expectedHeader := `INSERT INTO "test_table" ("id", "name") VALUES`
+	if !strings.Contains(contentStr, expectedHeader) {
+		t.Errorf("Expected to find INSERT header: %s", expectedHeader)
+	}
 
-		// Each non-empty line should be a complete INSERT statement
-		if !strings.HasPrefix(line, "INSERT INTO") {
-			t.Errorf("Line should start with INSERT INTO: %s", line)
-		}
+	// Verify value row format with tab indentation
+	if !strings.Contains(contentStr, "\t(1, 'test');") {
+		t.Error("Expected to find value row: \\t(1, 'test');")
+	}
 
-		if !strings.HasSuffix(strings.TrimSpace(line), ");") {
-			t.Errorf("Line should end with ); : %s", line)
-		}
+	// Verify overall structure
+	lines := strings.Split(strings.TrimSpace(contentStr), "\n")
+	if len(lines) != 2 {
+		t.Errorf("Expected 2 lines (header + value), got %d", len(lines))
+	}
+
+	// First line should be the INSERT INTO ... VALUES
+	if !strings.HasPrefix(lines[0], "INSERT INTO") {
+		t.Error("First line should start with INSERT INTO")
+	}
+
+	// Second line should be the value row with tab and semicolon
+	if !strings.HasPrefix(lines[1], "\t(") {
+		t.Error("Second line should start with tab and opening parenthesis")
+	}
+
+	if !strings.HasSuffix(lines[1], ");") {
+		t.Error("Second line should end with );")
 	}
 }
 
@@ -634,8 +650,6 @@ func TestWriteSQLBuffering(t *testing.T) {
 		t.Errorf("Expected 15000 INSERT statements, got %d", insertCount)
 	}
 }
-
-// Add this test to sql_exporter_test.go
 
 func TestWriteSQLWithBatchInsert(t *testing.T) {
 	conn, cleanup := setupTestDB(t)
@@ -749,7 +763,7 @@ func TestWriteSQLWithBatchInsert(t *testing.T) {
 			},
 		},
 		{
-			name:            "batch insert with value 1 (default behavior)",
+			name:            "batch insert with value 1 (single row per INSERT)",
 			query:           "SELECT generate_series(1, 5) as id",
 			tableName:       "single_row",
 			insertBatch:     1,
@@ -761,13 +775,18 @@ func TestWriteSQLWithBatchInsert(t *testing.T) {
 					t.Errorf("Expected 5 INSERT statements, got %d", insertCount)
 				}
 
-				// Each line should be a complete single-row INSERT
-				lines := strings.Split(strings.TrimSpace(content), "\n")
-				for _, line := range lines {
-					if line != "" && strings.Contains(line, "INSERT INTO") {
-						if !strings.Contains(line, "VALUES (") || !strings.HasSuffix(line, ");") {
-							t.Errorf("Expected single-row INSERT format, got: %s", line)
-						}
+				// With batch size 1, each INSERT should still use the multi-row format
+				// but with only one row: INSERT INTO ... VALUES\n\t(...);\n
+				if !strings.Contains(content, "VALUES\n\t(") {
+					t.Error("Expected multi-row format even with batch size 1")
+				}
+
+				// Each INSERT should have exactly 1 value row
+				lines := strings.Split(content, "INSERT INTO")
+				for i, insert := range lines[1:] { // Skip first empty element
+					valueRows := strings.Count(insert, "\t(")
+					if valueRows != 1 {
+						t.Errorf("INSERT %d: expected 1 value row, got %d", i+1, valueRows)
 					}
 				}
 			},
@@ -862,7 +881,7 @@ func TestWriteSQLWithBatchInsert(t *testing.T) {
 
 			// Verify total row count in output
 			totalValueRows := strings.Count(contentStr, "\t(")
-			if tt.insertBatch > 1 && totalValueRows != tt.expectedRows {
+			if totalValueRows != tt.expectedRows {
 				t.Errorf("Expected %d total value rows in output, got %d", tt.expectedRows, totalValueRows)
 			}
 		})

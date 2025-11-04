@@ -16,15 +16,16 @@ const (
 
 // ExportOptions holds export configuration
 type ExportOptions struct {
-	Format         string
-	Delimiter      rune
-	TableName      string
-	Compression    string
-	TimeFormat     string
-	TimeZone       string
-	NoHeader       bool
-	XmlRootElement string
-	XmlRowElement  string
+	Format          string
+	Delimiter       rune
+	TableName       string
+	Compression     string
+	TimeFormat      string
+	TimeZone        string
+	NoHeader        bool
+	XmlRootElement  string
+	XmlRowElement   string
+	RowPerStatement int
 }
 
 // Exporter interface defines export operations

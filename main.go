@@ -13,22 +13,23 @@ import (
 )
 
 var (
-	sqlQuery       string
-	sqlFile        string
-	outputPath     string
-	format         string
-	delimiter      string
-	connString     string
-	tableName      string
-	compression    string
-	timeFormat     string
-	timeZone       string
-	xmlRootElement string
-	xmlRowElement  string
-	withCopy       bool
-	failOnEmpty    bool
-	noHeader       bool
-	verbose        bool
+	sqlQuery        string
+	sqlFile         string
+	outputPath      string
+	format          string
+	delimiter       string
+	connString      string
+	tableName       string
+	compression     string
+	timeFormat      string
+	timeZone        string
+	xmlRootElement  string
+	xmlRowElement   string
+	withCopy        bool
+	failOnEmpty     bool
+	noHeader        bool
+	verbose         bool
+	rowPerStatement int
 )
 
 func main() {
@@ -89,6 +90,7 @@ Supported output formats:
 	rootCmd.Flags().BoolVar(&noHeader, "no-header", false, "Skip header row in CSV output")
 	rootCmd.Flags().StringVarP(&xmlRootElement, "xml-root-tag", "", "results", "Sets the root element name for XML exports")
 	rootCmd.Flags().StringVarP(&xmlRowElement, "xml-row-tag", "", "row", "Sets the row element name for XML exports")
+	rootCmd.Flags().IntVarP(&rowPerStatement, "insert-batch", "", 1, "Number of rows per INSERT statement in SQL export")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 
 	rootCmd.MarkFlagRequired("output")
@@ -174,15 +176,16 @@ func runExport(cmd *cobra.Command, args []string) error {
 	defer store.Close()
 
 	options := exporters.ExportOptions{
-		Format:         format,
-		Delimiter:      delimRune,
-		TableName:      tableName,
-		Compression:    compression,
-		TimeFormat:     timeFormat,
-		TimeZone:       timeZone,
-		NoHeader:       noHeader,
-		XmlRootElement: xmlRootElement,
-		XmlRowElement:  xmlRowElement,
+		Format:          format,
+		Delimiter:       delimRune,
+		TableName:       tableName,
+		Compression:     compression,
+		TimeFormat:      timeFormat,
+		TimeZone:        timeZone,
+		NoHeader:        noHeader,
+		XmlRootElement:  xmlRootElement,
+		XmlRowElement:   xmlRowElement,
+		RowPerStatement: rowPerStatement,
 	}
 
 	if format == "csv" && withCopy {
@@ -255,6 +258,10 @@ func validateExportParams() error {
 	// Validate table name for SQL format
 	if format == "sql" && strings.TrimSpace(tableName) == "" {
 		return fmt.Errorf("error: --table (-t) is required when using SQL format")
+	}
+
+	if format == "sql" && rowPerStatement < 1 {
+		return fmt.Errorf("error: --rows-per-statement must be at least 1")
 	}
 
 	// Validate time format if provided

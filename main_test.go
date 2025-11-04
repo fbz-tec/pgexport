@@ -338,6 +338,7 @@ func TestValidateExportParams(t *testing.T) {
 				tableName = "users_backup"
 				timeFormat = ""
 				timeZone = ""
+				rowPerStatement = 1
 			},
 			wantErr: false,
 		},
@@ -393,6 +394,7 @@ func TestValidateExportParams(t *testing.T) {
 				tableName = ""
 				timeFormat = ""
 				timeZone = ""
+				rowPerStatement = 1
 			},
 			wantErr:     true,
 			errContains: "--table (-t) is required",
@@ -407,9 +409,25 @@ func TestValidateExportParams(t *testing.T) {
 				tableName = "   "
 				timeFormat = ""
 				timeZone = ""
+				rowPerStatement = 1
 			},
 			wantErr:     true,
 			errContains: "--table (-t) is required",
+		},
+		{
+			name: "SQL format with invalid insert batch",
+			setupFunc: func() {
+				sqlQuery = "SELECT * FROM users"
+				sqlFile = ""
+				format = "sql"
+				compression = "none"
+				tableName = "users_backup"
+				timeFormat = ""
+				timeZone = ""
+				rowPerStatement = 0
+			},
+			wantErr:     true,
+			errContains: "--insert-batch must be at least 1",
 		},
 		{
 			name: "invalid compression",

@@ -261,7 +261,7 @@ func validateExportParams() error {
 	}
 
 	if format == "sql" && rowPerStatement < 1 {
-		return fmt.Errorf("error: --rows-per-statement must be at least 1")
+		return fmt.Errorf("error: --insert-batch must be at least 1")
 	}
 
 	// Validate time format if provided

@@ -62,8 +62,9 @@ Supported output formats:
 
    # Export to SQL insert statements
   pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders_table`,
-		RunE:         runExport,
-		SilenceUsage: true,
+		RunE:          runExport,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	// Version command
@@ -196,7 +197,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		logger.Debug("Using standard export mode for format: %s", format)
 		rows, err = store.ExecuteQuery(context.Background(), query)
 		if err != nil {
-			return fmt.Errorf("query execution failed: %w", err)
+			return err
 		}
 		defer rows.Close()
 		exporter := exporters.NewExporter()

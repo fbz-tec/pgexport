@@ -8,7 +8,7 @@ on:
       - 'fix/*'
       - 'release/*'
     tags:
-      - 'v*.*.*' # Trigger release workflow when pushing a version tag (e.g., v1.0.0)
+      - 'v*'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -200,10 +200,7 @@ jobs:
       - name: 📄 Create source code archive
         run: |
           VERSION="${{ github.ref_name }}"
-          
-          # Create source archive (excluding .git, dist, build artifacts)
           git archive --format=zip --prefix=pgxport-${VERSION}-src/ HEAD -o dist/pgxport-${VERSION}-src.zip
-          
           echo "✅ Source code archive created: pgxport-${VERSION}-src.zip"
 
       - name: 🧮 Generate checksums
@@ -218,6 +215,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
           body: |
             # pgxport ${{ github.ref_name }}
             

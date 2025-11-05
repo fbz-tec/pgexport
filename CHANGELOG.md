@@ -30,7 +30,7 @@ This is the first production-ready release of pgxport.
 go install github.com/fbz-tec/pgxport@v1.0.0
 ```
 
-Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases).
+Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/tag/v1.0.0).
 
 ---
 

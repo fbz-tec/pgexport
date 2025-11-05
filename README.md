@@ -6,23 +6,46 @@
 
 A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON, SQL).
 
+---
+
+## 📚 Table of Contents
+- [✨ Features](#-features)
+- [📦 Installation](#-installation)
+- [⚙️ Configuration](#️-configuration)
+- [📖 Usage](#-usage)
+- [📊 Output Formats](#-output-formats)
+- [🔍 Verbose Mode](#-verbose-mode)
+- [📄 Format Details](#-format-details)
+- [🗃️ Project Structure](#️-project-structure)
+- [🧩 Architecture](#-architecture)
+- [🛠️ Development](#️-development)
+- [🔒 Security](#-security)
+- [🚨 Error Handling](#-error-handling)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🗺️ Roadmap](#️-roadmap)
+- [💬 Support](#-support)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [⭐ Show Your Support](#-show-your-support)
+
+---
+
 ## ✨ Features
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to CSV, JSON, XML, and SQL formats
-- ⚡ High-performance CSV export using PostgreSQL native COPY mode (`--with-copy`)
-- 🔧 Customizable CSV delimiter and header control (`--no-header`) 
-- 🗜️ Optional gzip or zip compression for exported files
+- 📊 Export to **CSV**, **JSON**, **XML**, and **SQL** 
+- ⚡ High-performance CSV export using PostgreSQL native **COPY** mode (`--with-copy`)
+- 🔧 Customizable CSV delimiter and header
+- 🗜️ Compression: **gzip** / **zip** 
 - ⚙️ Simple configuration via environment variables or `.env` file
-- 🔗 Direct connection string support with `--dsn` flag
+- 🔗 DSN connection string support (`--dsn`)
 - 🛡️ Robust error handling and validation
-- ⚠️ Optional fail-on-empty mode (`--fail-on-empty`) for scripting and automation
-- 🔍 Verbose mode (`--verbose`) with detailed debug information
+- ⚠️ Fail on empty results (`--fail-on-empty`) for scripts & pipelines
+- 🔍 Verbose mode for detailed logging
 - ⚡ Optimized for performance with buffered I/O
 - 🔄 Batch INSERT statements for SQL exports (`--insert-batch`) for improved import performance
-- 🗃️ Clean architecture with separated concerns
-- 🎯 Built with [Cobra](https://github.com/spf13/cobra) for a clean CLI experience
+- 🎯 Built with [Cobra](https://github.com/spf13/cobra)
 
 ## 📦 Installation
 
@@ -31,34 +54,36 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - Go 1.19 or higher
 - PostgreSQL database access
 
-### Build from source
+### Option 1: Install via `go install` (Recommended)
 
 ```bash
-# Clone the repository
+go install github.com/fbz-tec/pgxport@latest
+```
+
+Verify installation:
+```bash
+pgxport version
+```
+
+### Option 2: Download pre-built binaries
+
+Download from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/latest)
+
+
+### Option 3: Build from source
+
+```bash
 git clone https://github.com/fbz-tec/pgxport.git
 cd pgxport
-
-# Install dependencies
-go mod download
-
-# Build the binary
 go build -o pgxport
 
 # (Optional) Install to your PATH
 sudo cp pgxport /usr/local/bin/
 ```
 
-### Quick install (one-liner)
-
-```bash
-go install github.com/fbz-tec/pgxport@latest
-```
-
 ## ⚙️ Configuration
 
-### Option 1: Using `.env` file (Recommended for daily use)
-
-Create a `.env` file in your project directory or where you run the command:
+### Option 1: Using `.env` file (recommended)
 
 ```env
 DB_USER=myuser
@@ -68,11 +93,9 @@ DB_PORT=5432
 DB_NAME=mydb
 ```
 
-The `.env` file is automatically loaded when you run `pgxport`. No need to export variables!
-
 **Advantages:**
-- ✅ No need to export variables every time
-- ✅ Credentials stored in one place
+- ✅ Automatically loaded by pgxport
+- ✅ Keeps credentials local & secure
 
 ### Option 2: Using environment variables
 
@@ -92,29 +115,16 @@ Pass the connection string directly via command line:
 
 ```bash
 pgxport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
-
 ```
 
 ### Configuration Priority
 
 The system uses the following priority order:
 
-1. **`--dsn` flag** (highest priority, overrides everything)
-2. **Environment variables** (if defined, override `.env`)
-3. **`.env` file** (if present)
-4. **Default values** (lowest priority)
-
-### Environment Variables
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DB_USER` | Database username | `postgres` | No |
-| `DB_PASS` | Database password | _(empty)_ | Recommended |
-| `DB_HOST` | Database host | `localhost` | No |
-| `DB_PORT` | Database port | `5432` | No |
-| `DB_NAME` | Database name | `postgres` | No |
-
-**Note**: While default values are provided, it's recommended to explicitly set all variables for production use.
+1. `--dsn`
+2. Environment variables
+3. `.env` file
+4. Defaults
 
 ## 📖 Usage
 
@@ -155,6 +165,33 @@ pgxport [command] [flags]
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 
+## 📊 Output Formats
+
+### Format Capabilities
+
+| Format | Compression | Timezone Support | COPY Mode |
+|---------|------------|------------------|-----------|
+| CSV | ✅ | ✅ | ✅ |
+| JSON | ✅ | ✅ | ❌ |
+| XML | ✅ | ✅ | ❌ |
+| SQL | ✅ | ✅ | ❌ |
+
+### Common Flags (All Formats)
+- `--compression` - Enable compression (gzip/zip)
+- `--time-format` - Custom date/time format
+- `--time-zone` - Timezone conversion
+- `--fail-on-empty` - Fail if query returns 0 rows
+- `--verbose` - Detailed logging
+
+### Format-Specific Flags
+
+| Format | Specific Flags | Description |
+|---------|----------------|-------------|
+| **CSV** | `--delimiter`<br>`--no-header`<br>`--with-copy` | Set delimiter character<br>Skip header row<br>Use PostgreSQL COPY mode |
+| **XML** | `--xml-root-tag`<br>`--xml-row-tag` | Customize root element name<br>Customize row element name |
+| **SQL** | `--table`<br>`--insert-batch` | Target table name (required)<br>Rows per INSERT statement |
+| **JSON** | *(none)* | Uses only common flags |
+
 ### Examples
 
 #### Basic Examples
@@ -166,7 +203,7 @@ pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 # Export with semicolon delimiter
 pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
 
-# New: Skip header row with --no-header
+# Skip header row with --no-header
 pgxport -s "SELECT id, name, email FROM users" -o users.csv -f csv --no-header
 
 # Execute query from a SQL file
@@ -189,16 +226,6 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
 # Export to SQL INSERT statements with schema
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_backup
-
-# Export to different schema
-pgxport -s "SELECT * FROM users" -o users.sql -f sql -t backup.users
-
-# Complex schema names with special characters
-pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "my-schema"."my-table"
-
-# Export with batch INSERT statements (100 rows per INSERT)
-pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders --insert-batch 100
-
 
 # Export with gzip compression
 pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
@@ -310,8 +337,9 @@ The `--time-format` flag accepts the following tokens:
 | `HH` | Hour 24h (00-23) | 14 |
 | `mm` | Minute (00-59) | 30 |
 | `ss` | Second (00-59) | 45 |
-| `SSS` | Milliseconds | 123 |
-| `S` | Deciseconds | 1 |
+| `SSS` | Milliseconds (3 digits) | 123 |
+| `SS` | Centiseconds (2 digits) | 12 |
+| `S` | Deciseconds (1 digit) | 6 |
 
 **Common Format Examples:**
 - ISO 8601: `yyyy-MM-ddTHH:mm:ss.SSS`
@@ -338,7 +366,7 @@ The `--time-zone` flag accepts standard IANA timezone names:
 - If `--time-zone` is not specified, the local system timezone is used
 - If an invalid timezone is provided, a warning is displayed and local timezone is used
 
-**Full timezone list:** [IANA Time Zone Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+**Full timezone list:** [IANA Time Zone Database](https://www.iana.org/time-zones)
 
 #### Advanced Examples
 
@@ -455,7 +483,7 @@ $ pgxport -s "SELECT * FROM users LIMIT 5" -o users.csv -v
 
 **Note:** Sensitive information (passwords) is automatically masked in logs.
 
-## 📊 Output Formats
+## 📄 Format Details
 
 ### CSV
 
@@ -468,9 +496,9 @@ $ pgxport -s "SELECT * FROM users LIMIT 5" -o users.csv -v
 
 **Example output:**
 ```csv
-id;name;email;created_at
-1;John Doe;john@example.com;2024-01-15T10:30:00.000
-2;Jane Smith;jane@example.com;2024-01-16T14:22:15.000
+id,name,email,created_at
+1,John Doe,john@example.com,2024-01-15 10:30:00
+2,Jane Smith,jane@example.com,2024-01-16 14:22:15
 ```
 
 ### ⚙️ COPY Mode (High-Performance CSV Export)
@@ -504,10 +532,7 @@ Example usage:
 pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
 ```
 
-#### ⚠️ Note:
-
-When using --with-copy, PostgreSQL handles type serialization.
-Date and timestamp formats may differ from standard csv export.
+**Note:** When using `--with-copy`, PostgreSQL handles type serialization. Date and timestamp formats may differ from standard CSV export.
 
 ### JSON
 
@@ -543,7 +568,6 @@ Date and timestamp formats may differ from standard csv export.
   - `--xml-root-tag` (default: `results`)
   - `--xml-row-tag` (default: `row`)
 - Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
-- Each column becomes a direct XML element (e.g., `<id>`, `<name>`, `<email>`)
 - **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
 - **Timezone**: Local system time (customizable with `--time-zone`)
 - NULL values exported as empty strings
@@ -557,13 +581,13 @@ Date and timestamp formats may differ from standard csv export.
     <id>1</id>
     <name>John Doe</name>
     <email>john@example.com</email>
-    <created_at>2024-01-15T10:30:00.000</created_at>
+    <created_at>2024-01-15 10:30:00</created_at>
   </row>
   <row>
     <id>2</id>
     <name>Jane Smith</name>
     <email>jane@example.com</email>
-    <created_at>2024-01-16T14:22:15.000</created_at>
+    <created_at>2024-01-16 14:22:15</created_at>
   </row>
 </results>
 ```
@@ -577,46 +601,15 @@ Date and timestamp formats may differ from standard csv export.
 
 **Example output:**
 ```sql
-INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000');
-INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000');
-INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15');
+INSERT INTO "users" ("id", "name", "email", "created_at") VALUES (3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30');
 
-# batch insert
+-- Batch insert example (with --insert-batch flag)
 INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
-	(1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00.000'),
-	(2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15.000'),
-	(3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30.000');
-
-# Export to a table in a specific schema
-pgxport -s "SELECT * FROM users" -o users.sql -f sql -t public.users
-
-# Export to a backup schema
-pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t backup.orders
-
-# Schema or table names with special characters
-pgxport -s "SELECT * FROM data" -o data.sql -f sql -t "\"my-schema\".\"my-table\""
-
-# Export from file to SQL with optimized batch size
-pgxport -F query.sql -o output.sql -f sql --table target_table --insert-batch 500
-```
-
-**Usage example:**
-```bash
-# Export to SQL INSERT statements
-pgxport -s "SELECT * FROM users WHERE active = true" -o users.sql -f sql -t users_backup
-
-# Export from file to SQL
-pgxport -F query.sql -o output.sql -f sql --table target_table
-
-# Complex data types (numbers, booleans, NULL, dates)
-pgxport -s "SELECT id, name, price, active, created_at, notes FROM products" \
-        -o products.sql -f sql -t products_backup
-
-# Export from file to SQL with optimized batch size
-pgxport -F query.sql -o output.sql -f sql --table target_table --insert-batch 500
-
-# Export to a table in a specific schema with batch INSERT
-pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t backup.orders --insert-batch 250        
+	(1, 'John Doe', 'john@example.com', '2024-01-15 10:30:00'),
+	(2, 'Jane Smith', 'jane@example.com', '2024-01-16 14:22:15'),
+	(3, 'Bob O''Brien', NULL, '2024-01-17 09:15:30');
 ```
 
 **SQL Format Features:**
@@ -653,9 +646,33 @@ pgxport/
 └── README.md           # Documentation
 ```
 
-### Architecture
+## 🧩 Architecture
 
 The project follows a clean, modular architecture with separated concerns:
+
+```mermaid
+flowchart TD
+  A[CLI - Cobra] --> B[main.go<br/>Orchestration]
+  B --> C[config.go<br/>Configuration]
+  B --> D[store.go<br/>DB Operations]
+  B --> E[exporters/<br/>Export Logic]
+  
+  E --> E1[CSV Exporter]
+  E --> E2[JSON Exporter]
+  E --> E3[XML Exporter]
+  E --> E4[SQL Exporter]
+  
+  E --> F[compression.go<br/>gzip/zip]
+  E --> G[common.go<br/>Shared Utils]
+  
+  B --> H[logger/<br/>Logging]
+  
+  style B fill:#e1f5ff
+  style E fill:#ffe1f5
+  style D fill:#f5ffe1
+```
+
+**Component Descriptions:**
 
 - **`exporters/`**: Modular export package with Strategy pattern
   - **`exporter.go`**: Defines the `Exporter` interface and factory
@@ -673,6 +690,53 @@ The project follows a clean, modular architecture with separated concerns:
 
 Each exporter is isolated in its own file, making the codebase easy to maintain, test, and extend with new formats.
 
+## 🛠️ Development
+
+This section is for developers who want to contribute to pgxport.
+
+### Setting up your development environment
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/fbz-tec/pgxport.git
+cd pgxport
+```
+
+**2. Install dependencies**
+
+The project uses the following main dependencies:
+
+- [pgx/v5](https://github.com/jackc/pgx) - PostgreSQL driver and toolkit
+- [cobra](https://github.com/spf13/cobra) - Modern CLI framework
+- [godotenv](https://github.com/joho/godotenv) - Load environment variables from `.env` file
+
+```bash
+go mod download
+go mod tidy
+```
+
+**3. Configure your database**
+
+Create a `.env` file:
+
+```bash
+cat > .env << EOF
+DB_USER=postgres
+DB_PASS=your_local_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=testdb
+EOF
+```
+
+**4. Verify your setup**
+
+```bash
+go build -o pgxport
+./pgxport -s "SELECT version()" -o version.csv
+```
+
 ### Building
 
 ```bash
@@ -682,7 +746,7 @@ go build -o pgxport
 # Build with version information
 go build -ldflags="-X main.Version=1.0.0" -o pgxport
 
-# Build for different platforms
+# Cross-platform builds
 GOOS=linux GOARCH=amd64 go build -o pgxport-linux
 GOOS=darwin GOARCH=amd64 go build -o pgxport-macos
 GOOS=windows GOARCH=amd64 go build -o pgxport.exe
@@ -697,54 +761,36 @@ go test ./...
 # Run tests with coverage
 go test -cover ./...
 
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
 # Run tests with verbose output
 go test -v ./...
 
 # Run specific test
-go test -run TestValidateExportParams
+go test -run TestValidateExportParams ./...
+
+# Run tests with race detection
+go test -race ./...
 ```
 
-### Dependencies
-
-The project uses the following main dependencies:
-
-- [pgx/v5](https://github.com/jackc/pgx) - PostgreSQL driver and toolkit
-- [cobra](https://github.com/spf13/cobra) - Modern CLI framework
-- [godotenv](https://github.com/joho/godotenv) - Load environment variables from `.env` file
-
-Install them with:
+### Code Quality
 
 ```bash
-go get -u github.com/jackc/pgx/v5
-go get -u github.com/spf13/cobra
-go get -u github.com/joho/godotenv
+# Format code
+go fmt ./...
+
+# Run linter (if golangci-lint is installed)
+golangci-lint run
+
+# Vet code
+go vet ./...
 ```
 
-### Setting up your development environment
+## 🔒 Security
 
-1. Clone the repository
-2. Create a `.env` file with your local database credentials:
-
-```bash
-cat > .env << EOF
-DB_USER=postgres
-DB_PASS=your_local_password
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=testdb
-EOF
-```
-
-3. Build and test:
-
-```bash
-go build -o pgxport
-./pgxport -s "SELECT version()" -o version.csv
-```
-
-## 🔒 Security Best Practices
-
-1. **Never commit credentials**: 
+1. **Never commit credentials**:
    - `.env` is already in `.gitignore`
    - Use `.env.example` for documentation
    - For production, use environment variables or secrets management
@@ -761,7 +807,7 @@ go build -o pgxport
 5. **Secure your output files**: Be careful with sensitive data in exported files
 
 6. **Review queries**: Always review SQL files before execution
-   
+
 7. **Verbose mode security**: Remember that `--verbose` logs queries and configuration. Avoid logging sensitive data.
 
 ## 🚨 Error Handling
@@ -776,7 +822,7 @@ The tool provides clear error messages for common issues:
 - **SQL format errors**: Ensure `--table` flag is provided when using SQL format
 - **Empty result errors**: Use `--fail-on-empty` to treat 0 rows as an error
 
-Example error output:
+**Example error output:**
 ```
 Error: Invalid format 'txt'. Valid formats are: csv, json, xml, sql
 Error: --table (-t) is required when using SQL format
@@ -808,21 +854,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🗺️ Roadmap
 
-- [x] ~~`.env` file support for easy configuration~~ ✅ Implemented!
-- [x] ~~Direct connection string support with `--dsn` flag~~ ✅ Implemented!
-- [x] ~~XML export format~~ ✅ Implemented!
-- [x] ~~SQL INSERT export format~~ ✅ Implemented!
-- [x] ~~High-performance CSV export using PostgreSQL COPY~~ ✅ Implemented!
-- [x] ~~Fail-on-empty flag for scripting and automation~~ ✅ Implemented!
-- [x] ~~Verbose mode for debugging~~ ✅ Implemented!
-- [ ] Excel (XLSX) export format
-- [ ] Query pagination for large datasets
-- [ ] Progress bar for long-running queries
-- [ ] Query result preview before export
-- [x] ~~Streaming mode for huge datasets~~ ✅ Implemented!
-- [x] ~~Compression support (gzip, zip)~~ ✅ Implemented!
-- [x] ~~SQL format with column names: `INSERT INTO table (col1, col2) VALUES ...`~~ ✅ Implemented!
-- [x] ~~Batch INSERT statements for better performance~~ ✅ Implemented!
+### ✅ Completed
+- `.env` configuration  
+- `--dsn` flag  
+- XML / JSON / SQL exporters  
+- COPY mode  
+- Streaming + compression  
+- Fail-on-empty mode  
+- Batch SQL inserts  
+
+### 🚧 Planned
+- [ ] Excel (XLSX) export  
+- [ ] Interactive password prompt  
+- [ ] Pagination for large queries  
+- [ ] Progress bar & export metrics  
+- [ ] Data preview before export 
 
 ## 💬 Support
 
@@ -840,7 +886,8 @@ If you encounter any issues or have questions:
 
 ## ⭐ Show Your Support
 
-If you find this project helpful, please consider giving it a star on GitHub!
+If you find **pgxport** useful:  
+⭐ Star the repo & share it with your team!
 
 ---
 

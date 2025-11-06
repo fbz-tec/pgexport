@@ -199,12 +199,6 @@ jobs:
           echo "✅ Archives created:"
           ls -lh *.tar.gz *.zip
 
-      - name: 📄 Create source code archive
-        run: |
-          VERSION="${{ github.ref_name }}"
-          git archive --format=zip --prefix=pgxport-${VERSION}-src/ HEAD -o dist/pgxport-${VERSION}-src.zip
-          echo "✅ Source code archive created: pgxport-${VERSION}-src.zip"
-
       - name: 🧮 Generate checksums
         run: |
           cd dist
@@ -219,7 +213,6 @@ jobs:
           name: Release ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
           body: |
-            # pgxport ${{ github.ref_name }}
             
             ## 📦 Downloads
             
@@ -236,10 +229,6 @@ jobs:
             
             Each archive contains: binary + CHANGELOG + README + LICENSE
             
-            ### Source Code
-            
-            - `pgxport-${{ github.ref_name }}-src.zip` - Custom source archive
-            - GitHub also provides auto-generated source archives below
             
             ## 📚 Documentation
             

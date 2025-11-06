@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/xml"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/fbz-tec/pgexport/logger"
@@ -65,23 +66,38 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 		startRow := xml.StartElement{Name: xml.Name{Local: options.XmlRowElement}}
 
 		if err := encoder.EncodeToken(startRow); err != nil {
-			return rowCount, fmt.Errorf("error starting <%s>: %w", options.XmlRowElement, err)
+			return rowCount, fmt.Errorf("error opening <%s>: %w", options.XmlRowElement, err)
 		}
 
 		for i, field := range fields {
 			elem := xml.StartElement{Name: xml.Name{Local: field}}
-			if values[i] == nil {
+			val := formatXMLValue(values[i], layout, loc)
+			if val == "" {
 				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
-					return rowCount, fmt.Errorf("error starting <%s>: %w", elem, err)
+					return rowCount, fmt.Errorf("error opening <%s>: %w", elem, err)
 				}
 				if err := encoder.EncodeToken(xml.EndElement{Name: elem.Name}); err != nil {
 					return rowCount, fmt.Errorf("error closing </%s>: %w", elem, err)
 				}
 				continue
 			}
-			if err := encoder.EncodeElement(formatXMLValue(values[i], layout, loc), elem); err != nil {
-				return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
+			isJSONLike := strings.HasPrefix(val, "{") || strings.HasPrefix(val, "[") || strings.Contains(val, "\":")
+			if isJSONLike {
+				if err := encoder.EncodeToken(elem); err != nil {
+					return rowCount, fmt.Errorf("error opening <%s>: %w", field, err)
+				}
+				if _, err := bufferedWriter.WriteString(val); err != nil {
+					return rowCount, fmt.Errorf("error writing raw value for <%s>: %w", field, err)
+				}
+				if err := encoder.EncodeToken(xml.EndElement{Name: elem.Name}); err != nil {
+					return rowCount, fmt.Errorf("error closing </%s>: %w", field, err)
+				}
+			} else {
+				if err := encoder.EncodeElement(val, elem); err != nil {
+					return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
+				}
 			}
+
 		}
 
 		// End </row>

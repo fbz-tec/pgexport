@@ -172,12 +172,14 @@ func formatXMLValue(v interface{}, layout string, loc *time.Location) string {
 		return fmt.Sprintf("%v", s)
 
 	case []interface{}:
-		// Convert array to a JSON-like string for XML readability
-		jsonStr, err := json.Marshal(val)
-		if err != nil {
-			return ""
+		if len(val) == 0 {
+			return "{}"
 		}
-		return string(jsonStr)
+		elems := make([]string, len(val))
+		for i, elem := range val {
+			elems[i] = fmt.Sprintf("%v", elem)
+		}
+		return fmt.Sprintf("{%s}", strings.Join(elems, ","))
 
 	case map[string]interface{}:
 		// Convert JSON object to string for XML

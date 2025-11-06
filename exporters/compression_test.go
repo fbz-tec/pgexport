@@ -154,7 +154,7 @@ func TestCreateOutputWriter_ZIP(t *testing.T) {
 	}
 
 	// Verify .zip extension was added
-	expectedPath := testPath + ".zip"
+	expectedPath := fixExtension(testPath, ".zip")
 	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
 		t.Errorf("Expected file %s does not exist", expectedPath)
 	}
@@ -504,6 +504,29 @@ func TestCreateOutputWriter_FilePermissions(t *testing.T) {
 	_, err = os.ReadFile(testPath)
 	if err != nil {
 		t.Errorf("Failed to read created file: %v", err)
+	}
+}
+
+func TestFixExtension(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		ext   string
+		want  string
+	}{
+		{"no extension", "data", ".zip", "data.zip"},
+		{"no extension zip", "data.csv", ".zip", "data.zip"},
+		{"already correct zip", "data.csv.zip", ".zip", "data.csv.zip"},
+		{"different compression extension", "data.txt", ".bz2", "data.bz2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := fixExtension(tt.input, tt.ext)
+			if got != tt.want {
+				t.Errorf("fixExtension(%q, %q) = %q, want %q", tt.input, tt.ext, got, tt.want)
+			}
+		})
 	}
 }
 

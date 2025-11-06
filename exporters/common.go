@@ -33,6 +33,16 @@ func formatValue(v interface{}, layout string, loc *time.Location) interface{} {
 		return string(val)
 	case float32, float64:
 		return fmt.Sprintf("%.15g", val)
+	case pgtype.Numeric:
+		if !val.Valid {
+			return "NULL"
+		}
+
+		f, err := val.Float64Value()
+		if err != nil || !f.Valid {
+			return "NULL"
+		}
+		return fmt.Sprintf("%.15g", f.Float64)
 	default:
 		return v
 	}

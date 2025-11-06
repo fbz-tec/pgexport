@@ -74,7 +74,7 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 		//format values to strings
 		record := make([]string, len(values))
 		for i, v := range values {
-			record[i] = fmt.Sprintf("%v", formatValue(v, layout, loc))
+			record[i] = formatCSVValue(v, layout, loc)
 		}
 
 		rowCount++

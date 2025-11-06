@@ -59,7 +59,7 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		//Convert row to map
 		entry := make(map[string]interface{}, len(keys))
 		for i, key := range keys {
-			entry[key] = formatValue(values[i], layout, loc)
+			entry[key] = formatJSONValue(values[i], layout, loc)
 		}
 		rowCount++
 

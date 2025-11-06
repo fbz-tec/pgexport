@@ -79,7 +79,7 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 				}
 				continue
 			}
-			if err := encoder.EncodeElement(formatValue(values[i], layout, loc), elem); err != nil {
+			if err := encoder.EncodeElement(formatXMLValue(values[i], layout, loc), elem); err != nil {
 				return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
 			}
 		}

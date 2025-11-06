@@ -1,6 +1,7 @@
 package exporters
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -21,33 +22,177 @@ var timeFormatReplacer = strings.NewReplacer(
 	"S", "0", // Deciseconds
 )
 
-// formatValue formats a value for export (unified function)
 func formatValue(v interface{}, layout string, loc *time.Location) interface{} {
+	if v == nil {
+		return nil
+	}
+
+	switch val := v.(type) {
+	case time.Time:
+		return val.In(loc).Format(layout)
+	case []byte:
+		return string(val)
+	case float32:
+		return fmt.Sprintf("%.15g", val)
+	case float64:
+		return fmt.Sprintf("%.15g", val)
+	default:
+		return val
+	}
+}
+
+// formatJSONValue formats a value for JSON export
+func formatJSONValue(v interface{}, layout string, loc *time.Location) interface{} {
 	if v == nil {
 		return nil
 	}
 	switch val := v.(type) {
 	case time.Time:
 		return val.In(loc).Format(layout)
+	case [16]byte:
+		// UUID byte array
+		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
 	case []byte:
 		return string(val)
-	case float32, float64:
-		return fmt.Sprintf("%.15g", val)
 	case pgtype.Numeric:
 		if !val.Valid {
-			return "NULL"
+			return nil
 		}
-
 		f, err := val.Float64Value()
 		if err != nil || !f.Valid {
-			return "NULL"
+			return nil
 		}
-		return fmt.Sprintf("%.15g", f.Float64)
+		return f.Float64
+	case pgtype.Interval:
+		if !val.Valid {
+			return nil
+		}
+		v, err := val.Value()
+		if err != nil {
+			return nil
+		}
+		return fmt.Sprintf("%v", v)
 	default:
 		return v
 	}
 }
 
+// formatCSVValue formats a value for CSV export
+func formatCSVValue(v interface{}, layout string, loc *time.Location) string {
+	if v == nil {
+		return ""
+	}
+
+	switch val := v.(type) {
+	case time.Time:
+		return val.In(loc).Format(layout)
+	case [16]byte:
+		// UUID byte array
+		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
+	case []byte:
+		return string(val)
+	case pgtype.Numeric:
+		if !val.Valid {
+			return ""
+		}
+
+		f, err := val.Float64Value()
+		if err != nil || !f.Valid {
+			return ""
+		}
+		return fmt.Sprintf("%.15g", f.Float64)
+	case float32, float64:
+		return fmt.Sprintf("%.15g", val)
+	case pgtype.Interval:
+		if !val.Valid {
+			return ""
+		}
+		strVal, err := val.Value()
+		if err != nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", strVal)
+	case []interface{}:
+		if len(val) == 0 {
+			return "{}"
+		}
+		elems := make([]string, len(val))
+		for i, elem := range val {
+			elems[i] = fmt.Sprintf("%v", elem)
+		}
+		return fmt.Sprintf("{%s}", strings.Join(elems, ","))
+	case map[string]interface{}:
+		jsonStr, err := json.Marshal(val)
+		if err != nil {
+			return "{}"
+		}
+		return string(jsonStr)
+
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// formatXMLValue formats a value for XML export
+func formatXMLValue(v interface{}, layout string, loc *time.Location) string {
+	if v == nil {
+		return ""
+	}
+
+	switch val := v.(type) {
+	case time.Time:
+		return val.In(loc).Format(layout)
+
+	case [16]byte:
+		// UUID format
+		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
+
+	case []byte:
+		return string(val)
+
+	case pgtype.Numeric:
+		if !val.Valid {
+			return ""
+		}
+		f, err := val.Float64Value()
+		if err != nil || !f.Valid {
+			return ""
+		}
+		return fmt.Sprintf("%.15g", f.Float64)
+	case float32, float64:
+		return fmt.Sprintf("%.15g", val)
+	case pgtype.Interval:
+		if !val.Valid {
+			return ""
+		}
+		s, err := val.Value()
+		if err != nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", s)
+
+	case []interface{}:
+		// Convert array to a JSON-like string for XML readability
+		jsonStr, err := json.Marshal(val)
+		if err != nil {
+			return ""
+		}
+		return string(jsonStr)
+
+	case map[string]interface{}:
+		// Convert JSON object to string for XML
+		jsonStr, err := json.Marshal(val)
+		if err != nil {
+			return ""
+		}
+		return string(jsonStr)
+
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// formatSQLValue formats a value for SQL export
 func formatSQLValue(v interface{}) string {
 	if v == nil {
 		return "NULL"

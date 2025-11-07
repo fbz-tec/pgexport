@@ -2,11 +2,11 @@
 
 All notable changes to pgxport will be documented in this file.
 
-## [1.0.0] - 2025-11-04
+## [v1.0.0-rc1] - 2025-11-07
 
-### First Stable Release
+### First Pre-Release
 
-This is the first production-ready release of pgxport.
+This is the first pre-release of pgxport.
 
 #### Features
 
@@ -30,7 +30,7 @@ This is the first production-ready release of pgxport.
 go install github.com/fbz-tec/pgxport@v1.0.0
 ```
 
-Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/tag/v1.0.0).
+Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/tag/untagged-3731b225ccbb85fa3000).
 
 ---
 

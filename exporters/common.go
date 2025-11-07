@@ -200,9 +200,9 @@ func formatSQLValue(v interface{}) string {
 		return "NULL"
 	}
 	switch val := v.(type) {
-	case string:
-		escaped := strings.ReplaceAll(val, "'", "''")
-		return fmt.Sprintf("'%s'", escaped)
+	case [16]byte:
+		// UUID byte array
+		return fmt.Sprintf("'%x-%x-%x-%x-%x'::uuid", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
 	case []byte:
 		str := string(val)
 		escaped := strings.ReplaceAll(str, "'", "''")
@@ -214,6 +214,15 @@ func formatSQLValue(v interface{}) string {
 			return "true"
 		}
 		return "false"
+	case pgtype.Interval:
+		if !val.Valid {
+			return ""
+		}
+		strVal, err := val.Value()
+		if err != nil {
+			return ""
+		}
+		return fmt.Sprintf("'%v'::interval", strVal)
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		return fmt.Sprintf("%d", val)
 	case float32, float64:
@@ -228,6 +237,21 @@ func formatSQLValue(v interface{}) string {
 			return "NULL"
 		}
 		return fmt.Sprintf("%.15g", f.Float64)
+	case []interface{}:
+		if len(val) == 0 {
+			return "{}"
+		}
+		elems := make([]string, len(val))
+		for i, elem := range val {
+			elems[i] = fmt.Sprintf("%v", elem)
+		}
+		return fmt.Sprintf("'{%s}'", strings.Join(elems, ","))
+	case map[string]interface{}:
+		jsonStr, err := json.Marshal(val)
+		if err != nil {
+			return "'{}'::jsonb"
+		}
+		return fmt.Sprintf("'%s'::jsonb", string(jsonStr))
 	default:
 		str := fmt.Sprintf("%v", val)
 		escaped := strings.ReplaceAll(str, "'", "''")

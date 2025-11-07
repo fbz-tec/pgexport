@@ -48,7 +48,14 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 
 	logger.Debug("Starting to write JSON objects...")
 
+	// Encode JSON to buffer with proper HTML escaping disabled
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("  ", "  ")
+
 	for rows.Next() {
+		buf.Reset()
 		values, err := rows.Values()
 		if err != nil {
 			return 0, fmt.Errorf("error reading row: %w", err)
@@ -67,12 +74,6 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 				return 0, fmt.Errorf("error writing comma for row %d: %w", rowCount, err)
 			}
 		}
-
-		// Encode JSON to buffer with proper HTML escaping disabled
-		var buf bytes.Buffer
-		encoder := json.NewEncoder(&buf)
-		encoder.SetEscapeHTML(false)
-		encoder.SetIndent("  ", "  ")
 
 		if err := encoder.Encode(entry); err != nil {
 			return 0, fmt.Errorf("error encoding JSON: %w", err)

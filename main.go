@@ -157,6 +157,10 @@ func runExport(cmd *cobra.Command, args []string) error {
 		logger.Debug("Using inline SQL query (%d characters)", len(query))
 	}
 
+	if err := validateQuery(query); err != nil {
+		return err
+	}
+
 	format = strings.ToLower(strings.TrimSpace(format))
 
 	var delimRune rune = ','

@@ -367,6 +367,49 @@ func TestConnectionReuse(t *testing.T) {
 	}
 }
 
+func TestValidateQuery(t *testing.T) {
+	tests := []struct {
+		name    string
+		query   string
+		wantErr bool
+	}{
+		{
+			name:    "valid SELECT",
+			query:   "SELECT * FROM users",
+			wantErr: false,
+		},
+		{
+			name:    "forbidden DELETE",
+			query:   "DELETE FROM users",
+			wantErr: true,
+		},
+		{
+			name:    "forbidden DROP",
+			query:   "DROP TABLE users",
+			wantErr: true,
+		},
+		{
+			name:    "chained DELETE",
+			query:   "SELECT 1; DELETE FROM users",
+			wantErr: true,
+		},
+		{
+			name:    "lowercase delete",
+			query:   "delete from users",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateQuery(tt.query)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateQuery() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // Helper function to get test database URL from environment
 // Set DB_TEST_URL environment variable to run integration tests
 // Example: export DB_TEST_URL="postgres://user:pass@localhost:5432/testdb"

@@ -2,8 +2,10 @@ package exporters
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/fbz-tec/pgexport/logger"
@@ -27,11 +29,6 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 	bufferedWriter := bufio.NewWriter(writeCloser)
 	defer bufferedWriter.Flush()
 
-	// Encode to JSON with indentation
-	encoder := json.NewEncoder(bufferedWriter)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-
 	// Get object keys names
 	fieldDescriptions := rows.FieldDescriptions()
 	keys := make([]string, len(fieldDescriptions))
@@ -39,6 +36,7 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		keys[i] = string(fd.Name)
 	}
 
+	// Write opening bracket
 	if _, err := bufferedWriter.WriteString("[\n"); err != nil {
 		return 0, fmt.Errorf("error writing start of JSON array: %w", err)
 	}
@@ -63,14 +61,32 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		}
 		rowCount++
 
+		// Write comma separator for subsequent entries
 		if rowCount > 1 {
 			if _, err := bufferedWriter.WriteString(",\n"); err != nil {
 				return 0, fmt.Errorf("error writing comma for row %d: %w", rowCount, err)
 			}
 		}
 
+		// Encode JSON to buffer with proper HTML escaping disabled
+		var buf bytes.Buffer
+		encoder := json.NewEncoder(&buf)
+		encoder.SetEscapeHTML(false)
+		encoder.SetIndent("  ", "  ")
+
 		if err := encoder.Encode(entry); err != nil {
 			return 0, fmt.Errorf("error encoding JSON: %w", err)
+		}
+
+		// Write the indented JSON object (trim the trailing newline from Encode)
+		jsonStr := strings.TrimSuffix(buf.String(), "\n")
+
+		if _, err := bufferedWriter.WriteString("  "); err != nil {
+			return 0, fmt.Errorf("error writing indentation for row %d: %w", rowCount, err)
+		}
+
+		if _, err := bufferedWriter.WriteString(jsonStr); err != nil {
+			return 0, fmt.Errorf("error writing JSON object for row %d: %w", rowCount, err)
 		}
 
 		if rowCount%10000 == 0 {
@@ -83,7 +99,8 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 		return rowCount, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	if _, err := bufferedWriter.WriteString("]\n"); err != nil {
+	// Write closing bracket
+	if _, err := bufferedWriter.WriteString("\n]\n"); err != nil {
 		return 0, fmt.Errorf("error writing end of JSON array: %w", err)
 	}
 

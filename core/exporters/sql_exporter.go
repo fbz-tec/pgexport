@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/logger"
+	"github.com/fbz-tec/pgexport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 

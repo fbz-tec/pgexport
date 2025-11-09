@@ -70,22 +70,24 @@ jobs:
           set -e
           mkdir -p build
 
-          # Compute short commit hash
+          # Compute version info
           GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
           VERSION="dev-${GIT_COMMIT}"
+          BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          MODULE="github.com/fbz-tec/pgxport"
+          
+          # ldflags for internal/version package
+          LDFLAGS="-X ${MODULE}/internal/version.AppVersion=${VERSION} \
+                   -X ${MODULE}/internal/version.GitCommit=${GIT_COMMIT} \
+                   -X ${MODULE}/internal/version.BuildTime=${BUILD_TIME}"
+
+          echo "Building with version: ${VERSION}"
 
           # Build Linux binary
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
-                             -X main.GitCommit=${GIT_COMMIT} \
-                             -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-                   -o build/pgxport
-          
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o build/pgxport
 
           # Build Windows binary
-          GOOS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${VERSION} \
-                                                       -X main.GitCommit=${GIT_COMMIT} \
-                                                       -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-                                                 -o build/pgxport.exe
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o build/pgxport.exe
 
       - name: 📤 Upload Linux artifact
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
@@ -104,7 +106,7 @@ jobs:
           retention-days: 3
             
       - name: 🧹 Cleanup build directory
-        if: always() # Ensures cleanup runs even if previous step fails
+        if: always()
         run: |
           echo "🧹 Cleaning up build artifacts..."
           rm -rf build
@@ -133,7 +135,12 @@ jobs:
           VERSION="${{ github.ref_name }}"
           BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           GIT_COMMIT=$(git rev-parse --short HEAD)
-          LDFLAGS="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}"
+          MODULE="github.com/fbz-tec/pgxport"
+          
+          LDFLAGS="-s -w \
+                   -X ${MODULE}/internal/version.AppVersion=${VERSION} \
+                   -X ${MODULE}/internal/version.BuildTime=${BUILD_TIME} \
+                   -X ${MODULE}/internal/version.GitCommit=${GIT_COMMIT}"
 
           echo "Building binaries for version ${VERSION}..."
 
@@ -202,9 +209,10 @@ jobs:
       - name: 🧮 Generate checksums
         run: |
           cd dist
-          for file in *; do
-            sha256sum "$file" > "$file.sha256"
-          done
+          sha256sum *.tar.gz *.zip > checksums.txt
+          echo ""
+          echo "✅ Checksums generated:"
+          cat checksums.txt
 
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2

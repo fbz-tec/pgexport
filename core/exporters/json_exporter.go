@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/internal/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 
-// exportToJSON writes query results to a JSON file with buffered I/O
-func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportOptions) (int, error) {
+type jsonExporter struct{}
+
+// writes query results to a JSON file with buffered I/O
+func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOptions) (int, error) {
 
 	start := time.Now()
 	logger.Debug("Preparing JSON export (indent=2 spaces, compression=%s)", options.Compression)
@@ -108,4 +110,8 @@ func (e *dataExporter) writeJSON(rows pgx.Rows, jsonPath string, options ExportO
 	logger.Debug("JSON export completed successfully: %d rows written in %v", rowCount, time.Since(start))
 
 	return rowCount, nil
+}
+
+func init() {
+	MustRegisterExporter(FormatJSON, func() Exporter { return &jsonExporter{} })
 }

@@ -6,11 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fbz-tec/pgexport/core/config"
-	"github.com/fbz-tec/pgexport/core/db"
-	"github.com/fbz-tec/pgexport/core/exporters"
-	"github.com/fbz-tec/pgexport/core/validation"
-	"github.com/fbz-tec/pgexport/internal/logger"
+	"github.com/fbz-tec/pgxport/core/config"
+	"github.com/fbz-tec/pgxport/core/db"
+	"github.com/fbz-tec/pgxport/core/exporters"
+	"github.com/fbz-tec/pgxport/core/validation"
+	"github.com/fbz-tec/pgxport/internal/logger"
+	"github.com/fbz-tec/pgxport/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 )
@@ -110,7 +111,7 @@ func Execute() {
 func runExport(cmd *cobra.Command, args []string) error {
 
 	logger.Debug("Initializing pgxport execution environment")
-	logger.Debug("Version: %s, Build: %s, Commit: %s", Version, BuildTime, GitCommit)
+	logger.Debug("Version: %s, Build: %s, Commit: %s", version.AppVersion, version.BuildTime, version.GitCommit)
 
 	logger.Debug("Validating export parameters")
 
@@ -139,6 +140,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	var err error
 	var rowCount int
 	var rows pgx.Rows
+	var exporter exporters.Exporter
 
 	if sqlFile != "" {
 		logger.Debug("Reading SQL from file: %s", sqlFile)
@@ -188,10 +190,19 @@ func runExport(cmd *cobra.Command, args []string) error {
 		RowPerStatement: rowPerStatement,
 	}
 
+	exporter, err = exporters.GetExporter(format)
+	if err != nil {
+		return err
+	}
+
 	if format == "csv" && withCopy {
 		logger.Debug("Using PostgreSQL COPY mode for fast CSV export")
-		exporter := exporters.NewCopyExporter()
-		rowCount, err = exporter.ExportCopy(store.GetConnection(), query, outputPath, options)
+
+		if copyExp, ok := exporter.(exporters.CopyCapable); ok {
+			rowCount, err = copyExp.ExportCopy(store.GetConnection(), query, outputPath, options)
+		} else {
+			return fmt.Errorf("format %s does not support COPY mode", format)
+		}
 	} else {
 		logger.Debug("Using standard export mode for format: %s", format)
 		rows, err = store.ExecuteQuery(context.Background(), query)
@@ -199,7 +210,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		defer rows.Close()
-		exporter := exporters.NewExporter()
+
 		rowCount, err = exporter.Export(rows, outputPath, options)
 	}
 
@@ -222,7 +233,7 @@ func validateExportParams() error {
 
 	// Normalize and validate format
 	format = strings.ToLower(strings.TrimSpace(format))
-	validFormats := []string{"csv", "json", "xml", "sql"}
+	validFormats := exporters.ListExporters()
 
 	isValid := false
 	for _, f := range validFormats {

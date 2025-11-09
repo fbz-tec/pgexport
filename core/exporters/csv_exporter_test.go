@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestWriteCSV(t *testing.T) {
+func TestExportCSV(t *testing.T) {
 	conn, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -183,7 +183,10 @@ func TestWriteCSV(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatCSV)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:      FormatCSV,
 				Delimiter:   tt.delimiter,
@@ -192,10 +195,10 @@ func TestWriteCSV(t *testing.T) {
 				TimeZone:    "",
 			}
 
-			_, err = exporter.writeCSV(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeCSV() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Export() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -266,7 +269,10 @@ func TestWriteCSVTimeFormatting(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatCSV)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:      FormatCSV,
 				Delimiter:   ',',
@@ -275,9 +281,9 @@ func TestWriteCSVTimeFormatting(t *testing.T) {
 				TimeZone:    tt.timeZone,
 			}
 
-			_, err = exporter.writeCSV(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeCSV() error: %v", err)
+				t.Fatalf("Export() error: %v", err)
 			}
 
 			content, err := os.ReadFile(outputPath)
@@ -315,7 +321,10 @@ func TestWriteCSVDataTypes(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatCSV)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatCSV,
 		Delimiter:   ',',
@@ -324,9 +333,9 @@ func TestWriteCSVDataTypes(t *testing.T) {
 		TimeZone:    "",
 	}
 
-	rowCount, err := exporter.writeCSV(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeCSV() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1 {
@@ -432,14 +441,24 @@ func TestWriteCopyCSV(t *testing.T) {
 			tmpDir := t.TempDir()
 			outputPath := filepath.Join(tmpDir, "output.csv")
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatCSV)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
+
 			options := ExportOptions{
 				Format:      FormatCSV,
 				Delimiter:   tt.delimiter,
 				Compression: "none",
 			}
 
-			rowCount, err := exporter.writeCopyCSV(conn, tt.query, outputPath, options)
+			copyExp, ok := exporter.(CopyCapable)
+
+			if !ok {
+				t.Fatalf("Copy mode is not supported: %v", err)
+			}
+
+			rowCount, err := copyExp.ExportCopy(conn, tt.query, outputPath, options)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeCopyCSV() error = %v, wantErr %v", err, tt.wantErr)
@@ -480,7 +499,10 @@ func TestWriteCSVLargeDataset(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatCSV)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatCSV,
 		Delimiter:   ',',
@@ -490,11 +512,11 @@ func TestWriteCSVLargeDataset(t *testing.T) {
 	}
 
 	start := time.Now()
-	rowCount, err := exporter.writeCSV(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	duration := time.Since(start)
 
 	if err != nil {
-		t.Fatalf("writeCSV() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 10000 {
@@ -688,7 +710,10 @@ func TestWriteCSVNoHeader(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatCSV)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:      FormatCSV,
 				Delimiter:   ',',
@@ -698,9 +723,9 @@ func TestWriteCSVNoHeader(t *testing.T) {
 				NoHeader:    tt.noHeader,
 			}
 
-			_, err = exporter.writeCSV(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeCSV() error: %v", err)
+				t.Fatalf("Export() error: %v", err)
 			}
 
 			tt.checkFunc(t, outputPath, tt.noHeader)
@@ -805,7 +830,11 @@ func TestWriteCopyCSVNoHeader(t *testing.T) {
 			tmpDir := t.TempDir()
 			outputPath := filepath.Join(tmpDir, "output.csv")
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatCSV)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
+
 			options := ExportOptions{
 				Format:      FormatCSV,
 				Delimiter:   ',',
@@ -813,7 +842,14 @@ func TestWriteCopyCSVNoHeader(t *testing.T) {
 				NoHeader:    tt.noHeader,
 			}
 
-			_, err := exporter.writeCopyCSV(conn, tt.query, outputPath, options)
+			copyExp, ok := exporter.(CopyCapable)
+
+			if !ok {
+				t.Fatalf("Copy mode is not supported by this exporter")
+			}
+
+			_, err = copyExp.ExportCopy(conn, tt.query, outputPath, options)
+
 			if err != nil {
 				t.Fatalf("writeCopyCSV() error: %v", err)
 			}
@@ -823,7 +859,7 @@ func TestWriteCopyCSVNoHeader(t *testing.T) {
 	}
 }
 
-func BenchmarkWriteCSV(b *testing.B) {
+func BenchmarkExportCSV(b *testing.B) {
 	testURL := os.Getenv("DB_TEST_URL")
 	if testURL == "" {
 		b.Skip("Skipping benchmark: DB_TEST_URL not set")
@@ -837,7 +873,10 @@ func BenchmarkWriteCSV(b *testing.B) {
 	defer conn.Close(ctx)
 
 	tmpDir := b.TempDir()
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatCSV)
+	if err != nil {
+		b.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatCSV,
 		Delimiter:   ',',
@@ -855,7 +894,7 @@ func BenchmarkWriteCSV(b *testing.B) {
 			b.Fatalf("Query failed: %v", err)
 		}
 
-		_, err = exporter.writeCSV(rows, outputPath, options)
+		_, err = exporter.Export(rows, outputPath, options)
 		if err != nil {
 			b.Fatalf("writeCSV failed: %v", err)
 		}

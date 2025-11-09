@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/internal/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 
-// exportToCSV writes query results to a CSV file with buffered I/O
-func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOptions) (int, error) {
+type csvExporter struct{}
+
+// Export writes query results to a CSV file with buffered I/O.
+func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOptions) (int, error) {
 	start := time.Now()
 
 	logger.Debug("Preparing CSV export (delimiter=%q, noHeader=%v, compression=%s)",
@@ -126,7 +128,7 @@ func (e *dataExporter) writeCSV(rows pgx.Rows, csvPath string, options ExportOpt
 	return rowCount, nil
 }
 
-func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string, options ExportOptions) (int, error) {
+func (e *csvExporter) ExportCopy(conn *pgx.Conn, query string, csvPath string, options ExportOptions) (int, error) {
 
 	start := time.Now()
 	logger.Debug("Starting PostgreSQL COPY export (noHeader=%v, compression=%s)", options.NoHeader, options.Compression)
@@ -150,4 +152,8 @@ func (e *dataExporter) writeCopyCSV(conn *pgx.Conn, query string, csvPath string
 
 	return rowCount, nil
 
+}
+
+func init() {
+	MustRegisterExporter(FormatCSV, func() Exporter { return &csvExporter{} })
 }

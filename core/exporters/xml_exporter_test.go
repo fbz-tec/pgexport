@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestWriteXML(t *testing.T) {
+func TestExportXML(t *testing.T) {
 	conn, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -180,7 +180,10 @@ func TestWriteXML(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatXML)
+			if err != nil {
+				t.Fatalf("Failed to get xml exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:         FormatXML,
 				Compression:    tt.compression,
@@ -190,10 +193,10 @@ func TestWriteXML(t *testing.T) {
 				XmlRowElement:  "row",
 			}
 
-			_, err = exporter.writeXML(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeXML() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Export() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -264,7 +267,10 @@ func TestWriteXMLTimeFormatting(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatXML)
+			if err != nil {
+				t.Fatalf("Failed to get xml exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:         FormatXML,
 				Compression:    "none",
@@ -274,9 +280,9 @@ func TestWriteXMLTimeFormatting(t *testing.T) {
 				XmlRowElement:  "row",
 			}
 
-			_, err = exporter.writeXML(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeXML() error: %v", err)
+				t.Fatalf("export() error: %v", err)
 			}
 
 			content, err := os.ReadFile(outputPath)
@@ -314,7 +320,10 @@ func TestWriteXMLDataTypes(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -324,9 +333,9 @@ func TestWriteXMLDataTypes(t *testing.T) {
 		XmlRowElement:  "row",
 	}
 
-	rowCount, err := exporter.writeXML(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1 {
@@ -364,7 +373,10 @@ func TestWriteXMLStructure(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -374,9 +386,9 @@ func TestWriteXMLStructure(t *testing.T) {
 		XmlRowElement:  "row",
 	}
 
-	_, err = exporter.writeXML(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	content, err := os.ReadFile(outputPath)
@@ -420,7 +432,10 @@ func TestWriteXMLValidXML(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -430,9 +445,9 @@ func TestWriteXMLValidXML(t *testing.T) {
 		XmlRowElement:  "row",
 	}
 
-	_, err = exporter.writeXML(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	// Try to parse the XML to verify it's valid
@@ -478,7 +493,10 @@ func TestWriteXMLCustomTags(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -488,9 +506,9 @@ func TestWriteXMLCustomTags(t *testing.T) {
 		XmlRowElement:  "record",
 	}
 
-	_, err = exporter.writeXML(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	content, err := os.ReadFile(outputPath)
@@ -536,7 +554,10 @@ func TestWriteXMLLargeDataset(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -547,11 +568,11 @@ func TestWriteXMLLargeDataset(t *testing.T) {
 	}
 
 	start := time.Now()
-	rowCount, err := exporter.writeXML(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	duration := time.Since(start)
 
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1000 {
@@ -604,7 +625,10 @@ func TestWriteXMLSpecialXMLCharacters(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		t.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -614,9 +638,9 @@ func TestWriteXMLSpecialXMLCharacters(t *testing.T) {
 		XmlRowElement:  "row",
 	}
 
-	_, err = exporter.writeXML(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeXML() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	// Verify the file is valid XML by parsing it
@@ -632,7 +656,7 @@ func TestWriteXMLSpecialXMLCharacters(t *testing.T) {
 	}
 }
 
-func BenchmarkWriteXML(b *testing.B) {
+func BenchmarkExportXML(b *testing.B) {
 	testURL := os.Getenv("DB_TEST_URL")
 	if testURL == "" {
 		b.Skip("Skipping benchmark: DB_TEST_URL not set")
@@ -646,7 +670,10 @@ func BenchmarkWriteXML(b *testing.B) {
 	defer conn.Close(ctx)
 
 	tmpDir := b.TempDir()
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatXML)
+	if err != nil {
+		b.Fatalf("Failed to get xml exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:         FormatXML,
 		Compression:    "none",
@@ -665,7 +692,7 @@ func BenchmarkWriteXML(b *testing.B) {
 			b.Fatalf("Query failed: %v", err)
 		}
 
-		_, err = exporter.writeXML(rows, outputPath, options)
+		_, err = exporter.Export(rows, outputPath, options)
 		if err != nil {
 			b.Fatalf("writeXML failed: %v", err)
 		}

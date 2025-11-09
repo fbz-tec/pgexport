@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestWriteJSON(t *testing.T) {
+func TestExportJSON(t *testing.T) {
 	conn, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -176,7 +176,10 @@ func TestWriteJSON(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatJSON)
+			if err != nil {
+				t.Fatalf("Failed to get json exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:      FormatJSON,
 				Compression: tt.compression,
@@ -184,10 +187,10 @@ func TestWriteJSON(t *testing.T) {
 				TimeZone:    "",
 			}
 
-			_, err = exporter.writeJSON(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Export() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -280,7 +283,10 @@ func TestWriteJSONTimeFormatting(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatJSON)
+			if err != nil {
+				t.Fatalf("Failed to get json exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:      FormatJSON,
 				Compression: "none",
@@ -288,9 +294,9 @@ func TestWriteJSONTimeFormatting(t *testing.T) {
 				TimeZone:    tt.timeZone,
 			}
 
-			_, err = exporter.writeJSON(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeJSON() error: %v", err)
+				t.Fatalf("Export() error: %v", err)
 			}
 
 			content, err := os.ReadFile(outputPath)
@@ -334,7 +340,10 @@ func TestWriteJSONDataTypes(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatJSON)
+	if err != nil {
+		t.Fatalf("Failed to get json exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatJSON,
 		Compression: "none",
@@ -342,9 +351,9 @@ func TestWriteJSONDataTypes(t *testing.T) {
 		TimeZone:    "",
 	}
 
-	rowCount, err := exporter.writeJSON(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeJSON() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1 {
@@ -402,7 +411,10 @@ func TestWriteJSONPrettyPrint(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatJSON)
+	if err != nil {
+		t.Fatalf("Failed to get json exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatJSON,
 		Compression: "none",
@@ -410,9 +422,9 @@ func TestWriteJSONPrettyPrint(t *testing.T) {
 		TimeZone:    "",
 	}
 
-	_, err = exporter.writeJSON(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeJSON() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	content, err := os.ReadFile(outputPath)
@@ -457,7 +469,10 @@ func TestWriteJSONLargeDataset(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatJSON)
+	if err != nil {
+		t.Fatalf("Failed to get json exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatJSON,
 		Compression: "none",
@@ -466,11 +481,11 @@ func TestWriteJSONLargeDataset(t *testing.T) {
 	}
 
 	start := time.Now()
-	rowCount, err := exporter.writeJSON(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	duration := time.Since(start)
 
 	if err != nil {
-		t.Fatalf("writeJSON() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1000 {
@@ -505,7 +520,7 @@ func TestWriteJSONLargeDataset(t *testing.T) {
 	}
 }
 
-func BenchmarkWriteJSON(b *testing.B) {
+func BenchmarkExportJSON(b *testing.B) {
 	testURL := os.Getenv("DB_TEST_URL")
 	if testURL == "" {
 		b.Skip("Skipping benchmark: DB_TEST_URL not set")
@@ -519,7 +534,10 @@ func BenchmarkWriteJSON(b *testing.B) {
 	defer conn.Close(ctx)
 
 	tmpDir := b.TempDir()
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatJSON)
+	if err != nil {
+		b.Fatalf("Failed to get json exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:      FormatJSON,
 		Compression: "none",
@@ -536,7 +554,7 @@ func BenchmarkWriteJSON(b *testing.B) {
 			b.Fatalf("Query failed: %v", err)
 		}
 
-		_, err = exporter.writeJSON(rows, outputPath, options)
+		_, err = exporter.Export(rows, outputPath, options)
 		if err != nil {
 			b.Fatalf("writeJSON failed: %v", err)
 		}

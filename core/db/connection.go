@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/fbz-tec/pgexport/internal/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 

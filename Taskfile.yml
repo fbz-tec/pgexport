@@ -8,7 +8,7 @@ vars:
     sh: date -u '+%Y-%m-%d_%H:%M:%S'
   GIT_COMMIT:
     sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
-  LDFLAGS: -ldflags "-X main.Version={{.VERSION}} -X main.BuildTime={{.BUILD_TIME}} -X main.GitCommit={{.GIT_COMMIT}}"
+  LDFLAGS: -ldflags "-X github.com/fbz-tec/pgxport/internal/version.AppVersion={{.VERSION}} -X github.com/fbz-tec/pgxport/internal/version.BuildTime={{.BUILD_TIME}} -X github.com/fbz-tec/pgxport/internal/version.GitCommit={{.GIT_COMMIT}}"
 
 tasks:
   default:

@@ -1,6 +1,6 @@
-module github.com/fbz-tec/pgexport
+module github.com/fbz-tec/pgxport
 
-go 1.24.9
+go 1.24.10
 
 require (
 	github.com/jackc/pgx/v5 v5.7.6

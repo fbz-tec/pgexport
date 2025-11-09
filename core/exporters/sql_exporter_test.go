@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestWriteSQL(t *testing.T) {
+func TestExportSQL(t *testing.T) {
 	conn, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -218,7 +218,10 @@ func TestWriteSQL(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatSQL)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:          FormatSQL,
 				TableName:       tt.tableName,
@@ -226,10 +229,10 @@ func TestWriteSQL(t *testing.T) {
 				RowPerStatement: 1,
 			}
 
-			_, err = exporter.writeSQL(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeSQL() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Export() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -270,7 +273,10 @@ func TestWriteSQLDataTypes(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "test_types",
@@ -278,9 +284,9 @@ func TestWriteSQLDataTypes(t *testing.T) {
 		RowPerStatement: 1,
 	}
 
-	rowCount, err := exporter.writeSQL(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1 {
@@ -358,7 +364,10 @@ func TestWriteSQLColumnOrder(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "test_table",
@@ -366,9 +375,9 @@ func TestWriteSQLColumnOrder(t *testing.T) {
 		RowPerStatement: 1,
 	}
 
-	_, err = exporter.writeSQL(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	content, err := os.ReadFile(outputPath)
@@ -442,7 +451,10 @@ func TestWriteSQLEscaping(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatSQL)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:          FormatSQL,
 				TableName:       "test_escape",
@@ -450,9 +462,9 @@ func TestWriteSQLEscaping(t *testing.T) {
 				RowPerStatement: 1,
 			}
 
-			_, err = exporter.writeSQL(rows, outputPath, options)
+			_, err = exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeSQL() error: %v", err)
+				t.Fatalf("Export() error: %v", err)
 			}
 
 			content, err := os.ReadFile(outputPath)
@@ -494,7 +506,10 @@ func TestWriteSQLLargeDataset(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "large_table",
@@ -503,11 +518,11 @@ func TestWriteSQLLargeDataset(t *testing.T) {
 	}
 
 	start := time.Now()
-	rowCount, err := exporter.writeSQL(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	duration := time.Since(start)
 
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 1000 {
@@ -553,7 +568,10 @@ func TestWriteSQLStatementFormat(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "test_table",
@@ -561,9 +579,9 @@ func TestWriteSQLStatementFormat(t *testing.T) {
 		RowPerStatement: 1,
 	}
 
-	_, err = exporter.writeSQL(rows, outputPath, options)
+	_, err = exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	content, err := os.ReadFile(outputPath)
@@ -622,7 +640,10 @@ func TestWriteSQLBuffering(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "buffer_test",
@@ -630,9 +651,9 @@ func TestWriteSQLBuffering(t *testing.T) {
 		RowPerStatement: 1,
 	}
 
-	rowCount, err := exporter.writeSQL(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 15000 {
@@ -851,7 +872,10 @@ func TestWriteSQLWithBatchInsert(t *testing.T) {
 			}
 			defer rows.Close()
 
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatSQL)
+			if err != nil {
+				t.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			options := ExportOptions{
 				Format:          FormatSQL,
 				TableName:       tt.tableName,
@@ -859,9 +883,9 @@ func TestWriteSQLWithBatchInsert(t *testing.T) {
 				RowPerStatement: tt.insertBatch,
 			}
 
-			rowCount, err := exporter.writeSQL(rows, outputPath, options)
+			rowCount, err := exporter.Export(rows, outputPath, options)
 			if err != nil {
-				t.Fatalf("writeSQL() error: %v", err)
+				t.Fatalf("Export() error: %v", err)
 			}
 
 			if rowCount != tt.expectedRows {
@@ -909,7 +933,10 @@ func TestWriteSQLBatchInsertLargeDataset(t *testing.T) {
 	}
 	defer rows.Close()
 
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		t.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "large_batch_table",
@@ -918,11 +945,11 @@ func TestWriteSQLBatchInsertLargeDataset(t *testing.T) {
 	}
 
 	start := time.Now()
-	rowCount, err := exporter.writeSQL(rows, outputPath, options)
+	rowCount, err := exporter.Export(rows, outputPath, options)
 	duration := time.Since(start)
 
 	if err != nil {
-		t.Fatalf("writeSQL() error: %v", err)
+		t.Fatalf("Export() error: %v", err)
 	}
 
 	if rowCount != 10000 {
@@ -988,7 +1015,10 @@ func BenchmarkWriteSQLBatchComparison(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			tmpDir := b.TempDir()
-			exporter := &dataExporter{}
+			exporter, err := GetExporter(FormatSQL)
+			if err != nil {
+				b.Fatalf("Failed to get sql exporter: %v", err)
+			}
 			query := fmt.Sprintf("SELECT generate_series(1, %d) as id, 'data_' || generate_series(1, %d) as data", bm.rowCount, bm.rowCount)
 
 			b.ResetTimer()
@@ -1007,7 +1037,7 @@ func BenchmarkWriteSQLBatchComparison(b *testing.B) {
 					RowPerStatement: bm.batchSize,
 				}
 
-				_, err = exporter.writeSQL(rows, outputPath, options)
+				_, err = exporter.Export(rows, outputPath, options)
 				if err != nil {
 					b.Fatalf("writeSQL failed: %v", err)
 				}
@@ -1018,7 +1048,7 @@ func BenchmarkWriteSQLBatchComparison(b *testing.B) {
 	}
 }
 
-func BenchmarkWriteSQL(b *testing.B) {
+func BenchmarkExportSQL(b *testing.B) {
 	testURL := os.Getenv("DB_TEST_URL")
 	if testURL == "" {
 		b.Skip("Skipping benchmark: DB_TEST_URL not set")
@@ -1032,7 +1062,10 @@ func BenchmarkWriteSQL(b *testing.B) {
 	defer conn.Close(ctx)
 
 	tmpDir := b.TempDir()
-	exporter := &dataExporter{}
+	exporter, err := GetExporter(FormatSQL)
+	if err != nil {
+		b.Fatalf("Failed to get sql exporter: %v", err)
+	}
 	options := ExportOptions{
 		Format:          FormatSQL,
 		TableName:       "bench_table",
@@ -1049,7 +1082,7 @@ func BenchmarkWriteSQL(b *testing.B) {
 			b.Fatalf("Query failed: %v", err)
 		}
 
-		_, err = exporter.writeSQL(rows, outputPath, options)
+		_, err = exporter.Export(rows, outputPath, options)
 		if err != nil {
 			b.Fatalf("writeSQL failed: %v", err)
 		}

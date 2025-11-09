@@ -21,8 +21,6 @@ This is the first pre-release of pgxport.
 - Custom date/time formats and timezone support
 - SQL export with schema-qualified table names
 - Batch INSERT statements for SQL exports (`--insert-batch`) for improved import performance
-- Comprehensive test coverage
-- CI/CD pipeline with automated builds
 
 #### Installation
 
@@ -30,7 +28,8 @@ This is the first pre-release of pgxport.
 go install github.com/fbz-tec/pgxport@v1.0.0
 ```
 
-Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/tag/untagged-3731b225ccbb85fa3000).
+Or download pre-built binaries from [GitHub Releases](https://github.com/fbz-tec/pgxport/releases/tag/v1.0.0-rc1).
+
 
 ---
 

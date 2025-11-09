@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 
-func (e *dataExporter) writeSQL(rows pgx.Rows, sqlPath string, options ExportOptions) (int, error) {
+type sqlExporter struct{}
+
+func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOptions) (int, error) {
 
 	start := time.Now()
 	logger.Debug("Preparing SQL export (table=%s, compression=%s, rows-per-statement=%d)",
@@ -115,4 +117,8 @@ func writeBatchInsert(writer *bufio.Writer, table string, columns []string, rows
 
 	_, err := writer.WriteString(stmt.String())
 	return err
+}
+
+func init() {
+	MustRegisterExporter(FormatSQL, func() Exporter { return &sqlExporter{} })
 }

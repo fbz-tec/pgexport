@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 )
 
 const (

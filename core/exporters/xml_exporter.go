@@ -7,12 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fbz-tec/pgexport/logger"
+	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
 
-// exportToXML writes query results to an XML file with buffered I/O
-func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
+type xmlExporter struct{}
+
+// writes query results to an XML file with buffered I/O
+func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOptions) (int, error) {
 
 	start := time.Now()
 	logger.Debug("Preparing XML export (indent=2 spaces, compression=%s)", options.Compression)
@@ -130,4 +132,8 @@ func (e *dataExporter) writeXML(rows pgx.Rows, xmlPath string, options ExportOpt
 	logger.Debug("XML export completed successfully: %d rows written in %v", rowCount, time.Since(start))
 
 	return rowCount, nil
+}
+
+func init() {
+	MustRegisterExporter(FormatXML, func() Exporter { return &xmlExporter{} })
 }

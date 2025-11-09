@@ -1,4 +1,4 @@
-module github.com/fbz-tec/pgexport
+module github.com/fbz-tec/pgxport
 
 go 1.24.10
 

@@ -98,15 +98,15 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 		}
 	}
 
-	if err := rows.Err(); err != nil {
-		return rowCount, fmt.Errorf("error iterating rows: %w", err)
-	}
-
 	logger.Debug("Flushing CSV buffers to disk...")
 	writer.Flush()
 
 	if err := writer.Error(); err != nil {
 		return rowCount, fmt.Errorf("error flushing CSV: %w", err)
+	}
+
+	if err := rows.Err(); err != nil {
+		return rowCount, fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	elapsed := time.Since(start)

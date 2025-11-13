@@ -151,7 +151,7 @@ pgxport [command] [flags]
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
-| `--no-header` | - | Skip CSV header row in output | `false` | No |
+| `--no-header` | `-n` | Skip CSV header row in output | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
 | `--xml-row-tag` | - | Sets the row element name for XML exports | `row` | No |

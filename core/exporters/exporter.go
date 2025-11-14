@@ -9,6 +9,7 @@ const (
 	FormatJSON = "json"
 	FormatXML  = "xml"
 	FormatSQL  = "sql"
+	FormatYAML = "yaml"
 )
 
 // ExportOptions holds export configuration

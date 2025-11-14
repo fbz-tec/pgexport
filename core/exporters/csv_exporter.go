@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/formatters"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -51,7 +52,7 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 	}
 
 	//datetime layout(Golang format) and timezone
-	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+	layout, loc := formatters.UserTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	// Write data rows
 	logger.Debug("Starting to write CSV rows...")
@@ -76,7 +77,7 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 		//format values to strings
 		record := make([]string, len(values))
 		for i, v := range values {
-			record[i] = formatCSVValue(v, layout, loc)
+			record[i] = formatters.FormatCSVValue(v, layout, loc)
 		}
 
 		rowCount++

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/formatters"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -53,7 +54,7 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 	}
 
 	//datetime layout(Golang format) and timezone
-	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+	layout, loc := formatters.UserTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
 
@@ -73,7 +74,7 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 
 		for i, field := range fields {
 			elem := xml.StartElement{Name: xml.Name{Local: field}}
-			val := formatXMLValue(values[i], layout, loc)
+			val := formatters.FormatXMLValue(values[i], layout, loc)
 			if val == "" {
 				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
 					return rowCount, fmt.Errorf("error opening <%s>: %w", elem, err)

@@ -38,7 +38,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "pgxport",
-	Short: "Export PostgreSQL query results to CSV, JSON, XML, or SQL formats",
+	Short: "Export PostgreSQL query results to CSV, JSON, XML, YAML or SQL formats",
 	Long: `A powerful CLI tool to export PostgreSQL query results.
 It supports direct SQL queries or SQL files, with customizable output options.
 		
@@ -46,6 +46,7 @@ Supported output formats:
  • CSV  — standard text export with customizable delimiter
  • JSON — structured export for API or data processing
  • XML  — hierarchical export for interoperability
+ • YAML — human-readable structured export for configs and tools
  • SQL  — generate INSERT statements`,
 	Example: `  # Export with inline query
   pgxport -s "SELECT * FROM users" -o users.csv
@@ -61,6 +62,9 @@ Supported output formats:
   
   # Export to XML
   pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
+
+  # Export to YAML
+  pgxport -s "SELECT * FROM user" -o orders.yml -f yaml
 
    # Export to SQL insert statements
   pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders_table`,
@@ -277,14 +281,14 @@ func validateExportParams() error {
 
 	// Validate time format if provided
 	if timeFormat != "" {
-		if err := exporters.ValidateTimeFormat(timeFormat); err != nil {
+		if err := validation.ValidateTimeFormat(timeFormat); err != nil {
 			return fmt.Errorf("error: Invalid time format '%s'. Use format like 'yyyy-MM-dd HH:mm:ss'", timeFormat)
 		}
 	}
 
 	// Validate timezone if provided
 	if timeZone != "" {
-		if err := exporters.ValidateTimeZone(timeZone); err != nil {
+		if err := validation.ValidateTimeZone(timeZone); err != nil {
 			return fmt.Errorf("error: Invalid timezone '%s'. Use format like 'UTC' or 'Europe/Paris'", timeZone)
 		}
 	}

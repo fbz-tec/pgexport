@@ -2,12 +2,10 @@ package exporters
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/encoders"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -16,7 +14,6 @@ type jsonExporter struct{}
 
 // writes query results to a JSON file with buffered I/O
 func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOptions) (int, error) {
-
 	start := time.Now()
 	logger.Debug("Preparing JSON export (indent=2 spaces, compression=%s)", options.Compression)
 
@@ -24,14 +21,13 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 	if err != nil {
 		return 0, err
 	}
-
 	defer writeCloser.Close()
 
 	// Use buffered writer for better performance
 	bufferedWriter := bufio.NewWriter(writeCloser)
 	defer bufferedWriter.Flush()
 
-	// Get object keys names
+	// Get column names (keys)
 	fieldDescriptions := rows.FieldDescriptions()
 	keys := make([]string, len(fieldDescriptions))
 	for i, fd := range fieldDescriptions {
@@ -43,54 +39,40 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 		return 0, fmt.Errorf("error writing start of JSON array: %w", err)
 	}
 
-	//datetime layout(Golang format) and timezone
-	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
+	// Create ordered JSON encoder
+	orderedEncoder := encoders.NewOrderedJsonEncoder(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
-
 	logger.Debug("Starting to write JSON objects...")
 
-	// Encode JSON to buffer with proper HTML escaping disabled
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("  ", "  ")
-
 	for rows.Next() {
-		buf.Reset()
 		values, err := rows.Values()
 		if err != nil {
-			return 0, fmt.Errorf("error reading row: %w", err)
+			return rowCount, fmt.Errorf("error reading row: %w", err)
 		}
-
-		//Convert row to map
-		entry := make(map[string]interface{}, len(keys))
-		for i, key := range keys {
-			entry[key] = formatJSONValue(values[i], layout, loc)
-		}
-		rowCount++
 
 		// Write comma separator for subsequent entries
-		if rowCount > 1 {
+		if rowCount > 0 {
 			if _, err := bufferedWriter.WriteString(",\n"); err != nil {
-				return 0, fmt.Errorf("error writing comma for row %d: %w", rowCount, err)
+				return rowCount, fmt.Errorf("error writing comma for row %d: %w", rowCount, err)
 			}
 		}
 
-		if err := encoder.Encode(entry); err != nil {
-			return 0, fmt.Errorf("error encoding JSON: %w", err)
+		// Encode with preserved order
+		jsonBytes, err := orderedEncoder.EncodeRow(keys, values)
+		if err != nil {
+			return rowCount, fmt.Errorf("error encoding JSON for row %d: %w", rowCount, err)
 		}
 
-		// Write the indented JSON object (trim the trailing newline from Encode)
-		jsonStr := strings.TrimSuffix(buf.String(), "\n")
-
+		// Write with indentation
 		if _, err := bufferedWriter.WriteString("  "); err != nil {
-			return 0, fmt.Errorf("error writing indentation for row %d: %w", rowCount, err)
+			return rowCount, fmt.Errorf("error writing indentation for row %d: %w", rowCount, err)
+		}
+		if _, err := bufferedWriter.Write(jsonBytes); err != nil {
+			return rowCount, fmt.Errorf("error writing JSON object for row %d: %w", rowCount, err)
 		}
 
-		if _, err := bufferedWriter.WriteString(jsonStr); err != nil {
-			return 0, fmt.Errorf("error writing JSON object for row %d: %w", rowCount, err)
-		}
+		rowCount++
 
 		if rowCount%10000 == 0 {
 			bufferedWriter.Flush()
@@ -104,7 +86,7 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 
 	// Write closing bracket
 	if _, err := bufferedWriter.WriteString("\n]\n"); err != nil {
-		return 0, fmt.Errorf("error writing end of JSON array: %w", err)
+		return rowCount, fmt.Errorf("error writing end of JSON array: %w", err)
 	}
 
 	logger.Debug("JSON export completed successfully: %d rows written in %v", rowCount, time.Since(start))

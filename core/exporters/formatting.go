@@ -22,6 +22,7 @@ var timeFormatReplacer = strings.NewReplacer(
 	"S", "0", // Deciseconds
 )
 
+// formatValue is kept for backward compatibility (not used in new code)
 func formatValue(v interface{}, layout string, loc *time.Location) interface{} {
 	if v == nil {
 		return nil
@@ -41,217 +42,263 @@ func formatValue(v interface{}, layout string, loc *time.Location) interface{} {
 	}
 }
 
-// formatJSONValue formats a value for JSON export
-func formatJSONValue(v interface{}, layout string, loc *time.Location) interface{} {
-	if v == nil {
+// formatValueByOID is the central function that handles all PostgreSQL type conversions
+// It returns interface{} for maximum flexibility across different export formats
+func formatValueByOID(val interface{}, valueType uint32, userTimefmt string, timeZone string) interface{} {
+	if val == nil {
 		return nil
 	}
-	switch val := v.(type) {
-	case time.Time:
-		return val.In(loc).Format(layout)
-	case [16]byte:
-		// UUID byte array
-		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
-	case []byte:
-		return string(val)
-	case pgtype.Numeric:
-		if !val.Valid {
-			return nil
+
+	switch valueType {
+	case pgtype.DateOID:
+		if t, ok := val.(time.Time); ok {
+			dateFmt := extractUserDateFormat(userTimefmt)
+			layout := convertUserTimeFormat(dateFmt)
+			return t.Format(layout)
 		}
-		f, err := val.Float64Value()
-		if err != nil || !f.Valid {
-			return nil
+
+	case pgtype.TimestampOID:
+		if t, ok := val.(time.Time); ok {
+			layout := convertUserTimeFormat(userTimefmt)
+			return t.Format(layout)
 		}
-		return f.Float64
-	case pgtype.Interval:
-		if !val.Valid {
-			return nil
+
+	case pgtype.TimestamptzOID:
+		if t, ok := val.(time.Time); ok {
+			layout, loc := userTimeZoneFormat(userTimefmt, timeZone)
+			return t.In(loc).Format(layout)
 		}
-		v, err := val.Value()
-		if err != nil {
-			return nil
+
+	case pgtype.UUIDOID:
+		if uuid, ok := val.([16]byte); ok {
+			return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 		}
-		return fmt.Sprintf("%v", v)
-	default:
-		return v
+
+	case pgtype.ByteaOID:
+		if bytes, ok := val.([]byte); ok {
+			return string(bytes)
+		}
+
+	case pgtype.NumericOID:
+		if num, ok := val.(pgtype.Numeric); ok {
+			if !num.Valid {
+				return nil
+			}
+			f, err := num.Float64Value()
+			if err != nil || !f.Valid {
+				return nil
+			}
+			return f.Float64
+		}
+
+	case pgtype.IntervalOID:
+		if interval, ok := val.(pgtype.Interval); ok {
+			if !interval.Valid {
+				return nil
+			}
+			strVal, err := interval.Value()
+			if err != nil {
+				return nil
+			}
+			return strVal
+		}
+
+	case pgtype.JSONBOID, pgtype.JSONOID:
+		// Return as-is for JSON export, will be marshaled for CSV/XML
+		return val
 	}
+
+	// Return value as-is for generic types
+	return val
+}
+
+// formatJSONValue formats a value for JSON export
+func formatJSONValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) interface{} {
+	return formatValueByOID(val, valueType, userTimefmt, timeZone)
 }
 
 // formatCSVValue formats a value for CSV export
-func formatCSVValue(v interface{}, layout string, loc *time.Location) string {
-	if v == nil {
+func formatCSVValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
+	result := formatValueByOID(val, valueType, userTimefmt, timeZone)
+
+	if result == nil {
 		return ""
 	}
 
-	switch val := v.(type) {
-	case time.Time:
-		return val.In(loc).Format(layout)
-	case [16]byte:
-		// UUID byte array
-		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
-	case []byte:
-		return string(val)
-	case pgtype.Numeric:
-		if !val.Valid {
-			return ""
-		}
+	// Handle specific conversions for CSV format
+	switch v := result.(type) {
+	case string:
+		return v
 
-		f, err := val.Float64Value()
-		if err != nil || !f.Valid {
-			return ""
-		}
-		return fmt.Sprintf("%.15g", f.Float64)
-	case float32, float64:
-		return fmt.Sprintf("%.15g", val)
-	case pgtype.Interval:
-		if !val.Valid {
-			return ""
-		}
-		strVal, err := val.Value()
-		if err != nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", strVal)
+	case float64:
+		return fmt.Sprintf("%.15g", v)
+
+	case float32:
+		return fmt.Sprintf("%.15g", v)
+
 	case []interface{}:
-		if len(val) == 0 {
+		if len(v) == 0 {
 			return "{}"
 		}
-		elems := make([]string, len(val))
-		for i, elem := range val {
+		elems := make([]string, len(v))
+		for i, elem := range v {
 			elems[i] = fmt.Sprintf("%v", elem)
 		}
 		return fmt.Sprintf("{%s}", strings.Join(elems, ","))
-	case map[string]interface{}:
-		jsonStr, err := json.Marshal(val)
-		if err != nil {
-			return "{}"
-		}
-		return string(jsonStr)
 
 	default:
-		return fmt.Sprintf("%v", val)
+		// Special handling for JSON/JSONB in CSV
+		if valueType == pgtype.JSONBOID || valueType == pgtype.JSONOID {
+			jsonStr, err := json.Marshal(v)
+			if err != nil {
+				return "{}"
+			}
+			return string(jsonStr)
+		}
+		return fmt.Sprintf("%v", v)
 	}
 }
 
 // formatXMLValue formats a value for XML export
-func formatXMLValue(v interface{}, layout string, loc *time.Location) string {
-	if v == nil {
+func formatXMLValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
+	result := formatValueByOID(val, valueType, userTimefmt, timeZone)
+
+	if result == nil {
 		return ""
 	}
 
-	switch val := v.(type) {
-	case time.Time:
-		return val.In(loc).Format(layout)
+	// Handle specific conversions for XML format
+	switch v := result.(type) {
+	case string:
+		return v
 
-	case [16]byte:
-		// UUID format
-		return fmt.Sprintf("%x-%x-%x-%x-%x", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
+	case float64:
+		return fmt.Sprintf("%.15g", v)
 
-	case []byte:
-		return string(val)
-
-	case pgtype.Numeric:
-		if !val.Valid {
-			return ""
-		}
-		f, err := val.Float64Value()
-		if err != nil || !f.Valid {
-			return ""
-		}
-		return fmt.Sprintf("%.15g", f.Float64)
-	case float32, float64:
-		return fmt.Sprintf("%.15g", val)
-	case pgtype.Interval:
-		if !val.Valid {
-			return ""
-		}
-		s, err := val.Value()
-		if err != nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", s)
+	case float32:
+		return fmt.Sprintf("%.15g", v)
 
 	case []interface{}:
-		if len(val) == 0 {
+		if len(v) == 0 {
 			return "{}"
 		}
-		elems := make([]string, len(val))
-		for i, elem := range val {
+		elems := make([]string, len(v))
+		for i, elem := range v {
 			elems[i] = fmt.Sprintf("%v", elem)
 		}
 		return fmt.Sprintf("{%s}", strings.Join(elems, ","))
 
-	case map[string]interface{}:
-		// Convert JSON object to string for XML
-		jsonStr, err := json.Marshal(val)
-		if err != nil {
-			return ""
-		}
-		return string(jsonStr)
-
 	default:
-		return fmt.Sprintf("%v", val)
+		// Special handling for JSON/JSONB in XML
+		if valueType == pgtype.JSONBOID || valueType == pgtype.JSONOID {
+			jsonStr, err := json.Marshal(v)
+			if err != nil {
+				return ""
+			}
+			return string(jsonStr)
+		}
+		return fmt.Sprintf("%v", v)
 	}
 }
 
 // formatSQLValue formats a value for SQL export
-func formatSQLValue(v interface{}) string {
-	if v == nil {
+func formatSQLValue(val interface{}, valueType uint32) string {
+	if val == nil {
 		return "NULL"
 	}
-	switch val := v.(type) {
-	case [16]byte:
-		// UUID byte array
-		return fmt.Sprintf("'%x-%x-%x-%x-%x'::uuid", val[0:4], val[4:6], val[6:8], val[8:10], val[10:16])
-	case []byte:
-		str := string(val)
-		escaped := strings.ReplaceAll(str, "'", "''")
-		return fmt.Sprintf("'%s'", escaped)
-	case time.Time:
-		return fmt.Sprintf("'%s'", val.Format("2006-01-02T15:04:05.000"))
-	case bool:
-		if val {
-			return "true"
-		}
-		return "false"
-	case pgtype.Interval:
-		if !val.Valid {
-			return ""
-		}
-		strVal, err := val.Value()
-		if err != nil {
-			return ""
-		}
-		return fmt.Sprintf("'%v'::interval", strVal)
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", val)
-	case float32, float64:
-		return fmt.Sprintf("%.15g", val)
-	case pgtype.Numeric:
-		if !val.Valid {
-			return "NULL"
+
+	switch valueType {
+	case pgtype.DateOID:
+		if t, ok := val.(time.Time); ok {
+			return fmt.Sprintf("'%s'::date", t.Format("2006-01-02"))
 		}
 
-		f, err := val.Float64Value()
-		if err != nil || !f.Valid {
-			return "NULL"
+	case pgtype.TimestampOID:
+		if t, ok := val.(time.Time); ok {
+			return fmt.Sprintf("'%s'::timestamp", t.Format("2006-01-02 15:04:05"))
 		}
-		return fmt.Sprintf("%.15g", f.Float64)
-	case []interface{}:
-		if len(val) == 0 {
-			return "{}"
+
+	case pgtype.TimestamptzOID:
+		if t, ok := val.(time.Time); ok {
+			return fmt.Sprintf("'%s'::timestamptz", t.Format("2006-01-02 15:04:05"))
 		}
-		elems := make([]string, len(val))
-		for i, elem := range val {
-			elems[i] = fmt.Sprintf("%v", elem)
+
+	case pgtype.UUIDOID:
+		if uuid, ok := val.([16]byte); ok {
+			return fmt.Sprintf("'%x-%x-%x-%x-%x'::uuid", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 		}
-		return fmt.Sprintf("'{%s}'", strings.Join(elems, ","))
-	case map[string]interface{}:
+
+	case pgtype.ByteaOID:
+		if bytes, ok := val.([]byte); ok {
+			escaped := strings.ReplaceAll(string(bytes), "'", "''")
+			return fmt.Sprintf("'%s'::bytea", escaped)
+		}
+
+	case pgtype.BoolOID:
+		if b, ok := val.(bool); ok {
+			if b {
+				return "true"
+			}
+			return "false"
+		}
+
+	case pgtype.NumericOID:
+		if num, ok := val.(pgtype.Numeric); ok {
+			if !num.Valid {
+				return "NULL"
+			}
+			f, err := num.Float64Value()
+			if err != nil {
+				return "NULL"
+			}
+			return fmt.Sprintf("%.15g", f.Float64)
+		}
+
+	case pgtype.IntervalOID:
+		if interval, ok := val.(pgtype.Interval); ok {
+			if !interval.Valid {
+				return "NULL"
+			}
+			strVal, err := interval.Value()
+			if err != nil {
+				return "NULL"
+			}
+			return fmt.Sprintf("'%v'::interval", strVal)
+		}
+
+	case pgtype.JSONBOID:
 		jsonStr, err := json.Marshal(val)
 		if err != nil {
 			return "'{}'::jsonb"
 		}
 		return fmt.Sprintf("'%s'::jsonb", string(jsonStr))
+
+	case pgtype.JSONOID:
+		jsonStr, err := json.Marshal(val)
+		if err != nil {
+			return "'{}'::json"
+		}
+		return fmt.Sprintf("'%s'::json", string(jsonStr))
+	}
+
+	// Generic SQL value formatting
+	switch v := val.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", val)
+
+	case float32, float64:
+		return fmt.Sprintf("%.15g", val)
+
+	case []interface{}:
+		if len(v) == 0 {
+			return "'{}'"
+		}
+		elems := make([]string, len(v))
+		for i, elem := range v {
+			elems[i] = fmt.Sprintf("%v", elem)
+		}
+		return fmt.Sprintf("'{%s}'", strings.Join(elems, ","))
+
 	default:
 		str := fmt.Sprintf("%v", val)
 		escaped := strings.ReplaceAll(str, "'", "''")
@@ -259,6 +306,7 @@ func formatSQLValue(v interface{}) string {
 	}
 }
 
+// quoteIdent quotes a SQL identifier (table or column name)
 func quoteIdent(s string) string {
 	parts := strings.Split(s, ".")
 	for i, part := range parts {
@@ -267,8 +315,8 @@ func quoteIdent(s string) string {
 	return strings.Join(parts, ".")
 }
 
+// userTimeZoneFormat returns the Go time layout and location for the user's format and timezone
 func userTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Location) {
-
 	layout := convertUserTimeFormat(userTimefmt)
 
 	if timeZone == "" {
@@ -276,7 +324,6 @@ func userTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Loca
 	}
 
 	loc, err := time.LoadLocation(timeZone)
-
 	if err != nil {
 		log.Printf("Warning: Invalid timezone %q, using local time: %v", timeZone, err)
 		return layout, time.Local
@@ -285,13 +332,36 @@ func userTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Loca
 	return layout, loc
 }
 
+// convertUserTimeFormat converts user-friendly format to Go time format
 func convertUserTimeFormat(userTimefmt string) string {
 	return timeFormatReplacer.Replace(userTimefmt)
 }
 
+// extractUserDateFormat extracts only the date portion from a datetime format string.
+// For example, "yyyy-MM-dd HH:mm:ss" becomes "yyyy-MM-dd".
+// This ensures DATE columns are exported without time components.
+func extractUserDateFormat(userFmt string) string {
+	dateTokens := []string{"yyyy", "yy", "MM", "dd"}
+	last := -1
+	for _, tok := range dateTokens {
+		idx := strings.LastIndex(userFmt, tok)
+		if idx != -1 {
+			end := idx + len(tok)
+			if end > last {
+				last = end
+			}
+		}
+	}
+
+	if last == -1 {
+		// No date tokens found, return original
+		return userFmt
+	}
+	return strings.TrimSpace(userFmt[:last])
+}
+
 // ValidateTimeFormat validates that a time format is valid by testing it
 func ValidateTimeFormat(format string) error {
-
 	// Empty format is invalid
 	if format == "" {
 		return fmt.Errorf("time format cannot be empty")

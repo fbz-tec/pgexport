@@ -32,9 +32,9 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 	defer bufferedWriter.Flush()
 
 	// Get object keys names
-	fieldDescriptions := rows.FieldDescriptions()
-	keys := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
+	fields := rows.FieldDescriptions()
+	keys := make([]string, len(fields))
+	for i, fd := range fields {
 		keys[i] = string(fd.Name)
 	}
 
@@ -42,9 +42,6 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 	if _, err := bufferedWriter.WriteString("[\n"); err != nil {
 		return 0, fmt.Errorf("error writing start of JSON array: %w", err)
 	}
-
-	//datetime layout(Golang format) and timezone
-	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
 
@@ -66,7 +63,7 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 		//Convert row to map
 		entry := make(map[string]interface{}, len(keys))
 		for i, key := range keys {
-			entry[key] = formatJSONValue(values[i], layout, loc)
+			entry[key] = formatJSONValue(values[i], fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 		}
 		rowCount++
 

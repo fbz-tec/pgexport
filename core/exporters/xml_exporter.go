@@ -46,14 +46,11 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 	}
 
 	// get fields names
-	fieldDescriptions := rows.FieldDescriptions()
-	fields := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
-		fields[i] = string(fd.Name)
+	fields := rows.FieldDescriptions()
+	keys := make([]string, len(fields))
+	for i, fd := range fields {
+		keys[i] = string(fd.Name)
 	}
-
-	//datetime layout(Golang format) and timezone
-	layout, loc := userTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
 
@@ -71,9 +68,9 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 			return rowCount, fmt.Errorf("error opening <%s>: %w", options.XmlRowElement, err)
 		}
 
-		for i, field := range fields {
-			elem := xml.StartElement{Name: xml.Name{Local: field}}
-			val := formatXMLValue(values[i], layout, loc)
+		for i, key := range keys {
+			elem := xml.StartElement{Name: xml.Name{Local: key}}
+			val := formatXMLValue(values[i], fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 			if val == "" {
 				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
 					return rowCount, fmt.Errorf("error opening <%s>: %w", elem, err)
@@ -86,17 +83,17 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 			isJSONLike := strings.HasPrefix(val, "{") || strings.HasPrefix(val, "[") || strings.Contains(val, "\":")
 			if isJSONLike {
 				if err := encoder.EncodeToken(elem); err != nil {
-					return rowCount, fmt.Errorf("error opening <%s>: %w", field, err)
+					return rowCount, fmt.Errorf("error opening <%s>: %w", key, err)
 				}
 				if _, err := bufferedWriter.WriteString(val); err != nil {
-					return rowCount, fmt.Errorf("error writing raw value for <%s>: %w", field, err)
+					return rowCount, fmt.Errorf("error writing raw value for <%s>: %w", key, err)
 				}
 				if err := encoder.EncodeToken(xml.EndElement{Name: elem.Name}); err != nil {
-					return rowCount, fmt.Errorf("error closing </%s>: %w", field, err)
+					return rowCount, fmt.Errorf("error closing </%s>: %w", key, err)
 				}
 			} else {
 				if err := encoder.EncodeElement(val, elem); err != nil {
-					return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
+					return rowCount, fmt.Errorf("error encoding field %s: %w", key, err)
 				}
 			}
 

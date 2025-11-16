@@ -3,6 +3,8 @@ package exporters
 import (
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestConvertUserTimeFormat(t *testing.T) {
@@ -188,127 +190,151 @@ func TestFormatSQLValue(t *testing.T) {
 		name     string
 		value    interface{}
 		expected string
+		valType  uint32
 	}{
 		{
 			name:     "nil value",
 			value:    nil,
 			expected: "NULL",
+			valType:  0,
 		},
 		{
 			name:     "string value",
 			value:    "test string",
 			expected: "'test string'",
+			valType:  pgtype.TextOID,
 		},
 		{
 			name:     "string with single quote",
 			value:    "O'Brien",
 			expected: "'O''Brien'",
+			valType:  pgtype.TextOID,
 		},
 		{
 			name:     "string with multiple quotes",
 			value:    "It's a 'test'",
 			expected: "'It''s a ''test'''",
+			valType:  pgtype.TextOID,
 		},
 		{
 			name:     "[]byte value",
 			value:    []byte("binary data"),
 			expected: "'binary data'",
+			valType:  pgtype.ByteaArrayOID,
 		},
 		{
 			name:     "[]byte with quotes",
 			value:    []byte("O'Connor"),
 			expected: "'O''Connor'",
+			valType:  pgtype.ByteaArrayOID,
 		},
 		{
 			name:     "time.Time value",
 			value:    testTime,
 			expected: "'2024-03-15T14:30:45.123'",
+			valType:  pgtype.TimestampOID,
 		},
 		{
 			name:     "bool true",
 			value:    true,
 			expected: "true",
+			valType:  pgtype.BoolOID,
 		},
 		{
 			name:     "bool false",
 			value:    false,
 			expected: "false",
+			valType:  pgtype.BoolOID,
 		},
 		{
 			name:     "int value",
 			value:    int(42),
 			expected: "42",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "int8 value",
 			value:    int8(127),
 			expected: "127",
+			valType:  pgtype.Int8OID,
 		},
 		{
 			name:     "int16 value",
 			value:    int16(32767),
 			expected: "32767",
+			valType:  pgtype.Int8OID,
 		},
 		{
 			name:     "int32 value",
 			value:    int32(2147483647),
 			expected: "2147483647",
+			valType:  pgtype.Int8OID,
 		},
 		{
 			name:     "int64 value",
 			value:    int64(9223372036854775807),
 			expected: "9223372036854775807",
+			valType:  pgtype.Int8OID,
 		},
 		{
 			name:     "uint value",
 			value:    uint(42),
 			expected: "42",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "uint8 value",
 			value:    uint8(255),
 			expected: "255",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "uint16 value",
 			value:    uint16(65535),
 			expected: "65535",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "uint32 value",
 			value:    uint32(4294967295),
 			expected: "4294967295",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "uint64 value",
 			value:    uint64(18446744073709551615),
 			expected: "18446744073709551615",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "float32 value",
 			value:    float32(3.14159),
 			expected: "3.1415901184082",
+			valType:  pgtype.Float4OID,
 		},
 		{
 			name:     "float64 value",
 			value:    float64(2.718281828459045),
 			expected: "2.71828182845905",
+			valType:  pgtype.Float8OID,
 		},
 		{
 			name:     "negative int",
 			value:    int(-42),
 			expected: "-42",
+			valType:  pgtype.Int4OID,
 		},
 		{
 			name:     "negative float",
 			value:    float64(-3.14),
 			expected: "-3.14",
+			valType:  pgtype.Float4OID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatSQLValue(tt.value)
+			result := formatSQLValue(tt.value, tt.valType)
 			if result != tt.expected {
 				t.Errorf("formatSQLValue(%v) = %q, want %q", tt.value, result, tt.expected)
 			}
@@ -563,31 +589,31 @@ func BenchmarkFormatSQLValue(b *testing.B) {
 
 	b.Run("string", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue("test string")
+			formatSQLValue("test string", pgtype.TextOID)
 		}
 	})
 
 	b.Run("string_with_quotes", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue("O'Brien's test")
+			formatSQLValue("O'Brien's test", pgtype.TextOID)
 		}
 	})
 
 	b.Run("int", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(42)
+			formatSQLValue(42, pgtype.Int4OID)
 		}
 	})
 
 	b.Run("float", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(3.14159)
+			formatSQLValue(3.14159, pgtype.Float4OID)
 		}
 	})
 
 	b.Run("time", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(testTime)
+			formatSQLValue(testTime, pgtype.TimestampOID)
 		}
 	})
 }

@@ -51,7 +51,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 
 		//format values
 		for i, val := range values {
-			record[i] = formatSQLValue(val)
+			record[i] = formatSQLValue(val, fields[i].DataTypeOID)
 		}
 
 		rowCount++

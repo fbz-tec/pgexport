@@ -215,12 +215,12 @@ func formatSQLValue(val interface{}, valueType uint32) string {
 
 	case pgtype.TimestampOID:
 		if t, ok := val.(time.Time); ok {
-			return fmt.Sprintf("'%s'::timestamp", t.Format("2006-01-02 15:04:05"))
+			return fmt.Sprintf("'%s'::timestamp", t.Format("2006-01-02 15:04:05.000"))
 		}
 
 	case pgtype.TimestamptzOID:
 		if t, ok := val.(time.Time); ok {
-			return fmt.Sprintf("'%s'::timestamptz", t.Format("2006-01-02 15:04:05"))
+			return fmt.Sprintf("'%s'::timestamptz", t.Format("2006-01-02 15:04:05.000-07"))
 		}
 
 	case pgtype.UUIDOID:

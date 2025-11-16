@@ -533,13 +533,13 @@ func TestFormatSQLValue(t *testing.T) {
 			name:      "Timestamp with cast",
 			value:     testTimestamp,
 			valueType: pgtype.TimestampOID,
-			expected:  "'2024-03-15 14:30:45'::timestamp",
+			expected:  "'2024-03-15 14:30:45.123'::timestamp",
 		},
 		{
 			name:      "Timestamptz with cast",
 			value:     testTimestamp,
 			valueType: pgtype.TimestamptzOID,
-			expected:  "'2024-03-15 14:30:45'::timestamptz",
+			expected:  "'2024-03-15 14:30:45.123+00'::timestamptz",
 		},
 		{
 			name:      "UUID with cast",

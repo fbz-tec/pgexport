@@ -38,10 +38,11 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 	defer writer.Flush()
 
 	// Write headers
+	fields := rows.FieldDescriptions()
+
 	if !options.NoHeader {
-		fieldDescriptions := rows.FieldDescriptions()
-		headers := make([]string, len(fieldDescriptions))
-		for i, fd := range fieldDescriptions {
+		headers := make([]string, len(fields))
+		for i, fd := range fields {
 			headers[i] = string(fd.Name)
 		}
 
@@ -50,9 +51,6 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 		}
 		logger.Debug("CSV headers written: %s", strings.Join(headers, string(options.Delimiter)))
 	}
-
-	//datetime layout(Golang format) and timezone
-	layout, loc := formatters.UserTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	// Write data rows
 	logger.Debug("Starting to write CSV rows...")
@@ -77,7 +75,7 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 		//format values to strings
 		record := make([]string, len(values))
 		for i, v := range values {
-			record[i] = formatters.FormatCSVValue(v, layout, loc)
+			record[i] = formatters.FormatCSVValue(v, fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 		}
 
 		rowCount++

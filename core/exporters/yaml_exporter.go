@@ -38,8 +38,10 @@ func (e *yamlExporter) Export(rows pgx.Rows, yamlPath string, options ExportOpti
 	// Column order
 	fields := rows.FieldDescriptions()
 	keys := make([]string, len(fields))
+	dataTypes := make([]uint32, len(fields))
 	for i, fd := range fields {
 		keys[i] = string(fd.Name)
+		dataTypes[i] = fd.DataTypeOID
 	}
 
 	rowEncoder := encoders.NewOrderedYamlEncoder(options.TimeFormat, options.TimeZone)
@@ -52,7 +54,7 @@ func (e *yamlExporter) Export(rows pgx.Rows, yamlPath string, options ExportOpti
 			return rowCount, fmt.Errorf("error reading row %d: %w", rowCount+1, err)
 		}
 
-		rowNode, err := rowEncoder.EncodeRow(keys, values)
+		rowNode, err := rowEncoder.EncodeRow(keys, dataTypes, values)
 		if err != nil {
 			return rowCount, fmt.Errorf("error encoding YAML row %d: %w", rowCount+1, err)
 		}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/fbz-tec/pgxport/core/formatters"
 )
@@ -12,20 +11,19 @@ import (
 // OrderedJsonEncoder encodes JSON while preserving key order
 type OrderedJsonEncoder struct {
 	timeLayout string
-	timezone   *time.Location
+	timezone   string
 }
 
 // NewOrderedJsonEncoder creates a new ordered JSON encoder with time formatting options
 func NewOrderedJsonEncoder(timeFormat, timeZone string) OrderedJsonEncoder {
-	layout, loc := formatters.UserTimeZoneFormat(timeFormat, timeZone)
 	return OrderedJsonEncoder{
-		timeLayout: layout,
-		timezone:   loc,
+		timeLayout: timeFormat,
+		timezone:   timeZone,
 	}
 }
 
 // EncodeJSONWithOrder encodes a map to JSON preserving the order with proper indentation
-func (o OrderedJsonEncoder) EncodeRow(keys []string, values []interface{}) ([]byte, error) {
+func (o OrderedJsonEncoder) EncodeRow(keys []string, dataTypes []uint32, values []interface{}) ([]byte, error) {
 	if len(keys) == 0 {
 		return []byte("{}"), nil
 	}
@@ -49,7 +47,7 @@ func (o OrderedJsonEncoder) EncodeRow(keys []string, values []interface{}) ([]by
 		row.WriteString(": ")
 
 		// value
-		formattedValue := formatters.FormatJSONValue(values[i], o.timeLayout, o.timezone)
+		formattedValue := formatters.FormatJSONValue(values[i], dataTypes[i], o.timeLayout, o.timezone)
 
 		// Marshal formatted value with HTML escaping disabled
 		valueJSON, err := marshalWithoutHTMLEscape(formattedValue)

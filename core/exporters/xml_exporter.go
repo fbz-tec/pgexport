@@ -47,14 +47,11 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 	}
 
 	// get fields names
-	fieldDescriptions := rows.FieldDescriptions()
-	fields := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
-		fields[i] = string(fd.Name)
+	fields := rows.FieldDescriptions()
+	keys := make([]string, len(fields))
+	for i, fd := range fields {
+		keys[i] = string(fd.Name)
 	}
-
-	//datetime layout(Golang format) and timezone
-	layout, loc := formatters.UserTimeZoneFormat(options.TimeFormat, options.TimeZone)
 
 	rowCount := 0
 
@@ -72,9 +69,9 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 			return rowCount, fmt.Errorf("error opening <%s>: %w", options.XmlRowElement, err)
 		}
 
-		for i, field := range fields {
+		for i, field := range keys {
 			elem := xml.StartElement{Name: xml.Name{Local: field}}
-			val := formatters.FormatXMLValue(values[i], layout, loc)
+			val := formatters.FormatXMLValue(values[i], fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 			if val == "" {
 				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
 					return rowCount, fmt.Errorf("error opening <%s>: %w", elem, err)

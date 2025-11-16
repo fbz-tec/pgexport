@@ -1,8 +1,11 @@
 package formatters
 
 import (
+	"math/big"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestConvertUserTimeFormat(t *testing.T) {
@@ -58,6 +61,54 @@ func TestConvertUserTimeFormat(t *testing.T) {
 			result := ConvertUserTimeFormat(tt.input)
 			if result != tt.expected {
 				t.Errorf("convertUserTimeFormat(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractUserDateFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "datetime format extracts date only",
+			input:    "yyyy-MM-dd HH:mm:ss",
+			expected: "yyyy-MM-dd",
+		},
+		{
+			name:     "date only format unchanged",
+			input:    "yyyy-MM-dd",
+			expected: "yyyy-MM-dd",
+		},
+		{
+			name:     "European datetime format",
+			input:    "dd/MM/yyyy HH:mm:ss",
+			expected: "dd/MM/yyyy",
+		},
+		{
+			name:     "US datetime format",
+			input:    "MM/dd/yyyy HH:mm:ss",
+			expected: "MM/dd/yyyy",
+		},
+		{
+			name:     "time only format unchanged",
+			input:    "HH:mm:ss",
+			expected: "HH:mm:ss",
+		},
+		{
+			name:     "no date tokens returns original",
+			input:    "HH:mm",
+			expected: "HH:mm",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractUserDateFormat(tt.input)
+			if result != tt.expected {
+				t.Errorf("extractUserDateFormat(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -135,6 +186,469 @@ func TestFormatValue(t *testing.T) {
 	}
 }
 
+func TestFormatValueByOID(t *testing.T) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+	testTimestamp := time.Date(2024, 3, 15, 14, 30, 45, 123000000, time.UTC)
+	testUUID := [16]byte{0x9f, 0x4d, 0xaf, 0x39, 0x5b, 0x76, 0x4b, 0x9c, 0xa1, 0x47, 0x82, 0x0f, 0x8f, 0x0c, 0x94, 0x5f}
+
+	tests := []struct {
+		name      string
+		val       interface{}
+		valueType uint32
+		timefmt   string
+		timezone  string
+		expected  interface{}
+	}{
+		{
+			name:      "nil value",
+			val:       nil,
+			valueType: pgtype.TextOID,
+			timefmt:   "yyyy-MM-dd",
+			timezone:  "",
+			expected:  nil,
+		},
+		{
+			name:      "Date with date-only format",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "yyyy-MM-dd",
+			timezone:  "",
+			expected:  "2021-09-25",
+		},
+		{
+			name:      "Date with datetime format extracts date",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "yyyy-MM-dd HH:mm:ss",
+			timezone:  "",
+			expected:  "2021-09-25",
+		},
+		{
+			name:      "Date with European format",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "dd/MM/yyyy",
+			timezone:  "",
+			expected:  "25/09/2021",
+		},
+		{
+			name:      "Timestamp without timezone",
+			val:       testTimestamp,
+			valueType: pgtype.TimestampOID,
+			timefmt:   "yyyy-MM-dd HH:mm:ss",
+			timezone:  "",
+			expected:  "2024-03-15 14:30:45",
+		},
+		{
+			name:      "Timestamp with milliseconds",
+			val:       testTimestamp,
+			valueType: pgtype.TimestampOID,
+			timefmt:   "yyyy-MM-dd HH:mm:ss.SSS",
+			timezone:  "",
+			expected:  "2024-03-15 14:30:45.123",
+		},
+		{
+			name:      "Timestamptz with UTC",
+			val:       testTimestamp,
+			valueType: pgtype.TimestamptzOID,
+			timefmt:   "yyyy-MM-dd HH:mm:ss",
+			timezone:  "UTC",
+			expected:  "2024-03-15 14:30:45",
+		},
+		{
+			name:      "Timestamptz with Europe/Paris",
+			val:       testTimestamp,
+			valueType: pgtype.TimestamptzOID,
+			timefmt:   "yyyy-MM-dd HH:mm:ss",
+			timezone:  "Europe/Paris",
+			expected:  "2024-03-15 15:30:45", // UTC+1 in March
+		},
+		{
+			name:      "UUID formatting",
+			val:       testUUID,
+			valueType: pgtype.UUIDOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "9f4daf39-5b76-4b9c-a147-820f8f0c945f",
+		},
+		{
+			name:      "Bytea to string",
+			val:       []byte("test data"),
+			valueType: pgtype.ByteaOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "test data",
+		},
+		{
+			name:      "Valid Numeric",
+			val:       pgtype.Numeric{Int: big.NewInt(125075), Exp: -2, Valid: true},
+			valueType: pgtype.NumericOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  1250.75,
+		},
+		{
+			name:      "Invalid Numeric",
+			val:       pgtype.Numeric{Valid: false},
+			valueType: pgtype.NumericOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  nil,
+		},
+		{
+			name:      "Generic string value",
+			val:       "test string",
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "test string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatValueByOID(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			if result != tt.expected {
+				t.Errorf("formatValueByOID() = %v (type %T), want %v (type %T)",
+					result, result, tt.expected, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatCSVValue(t *testing.T) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+	testArray := []interface{}{"pgxport", "go", "json"}
+
+	tests := []struct {
+		name      string
+		val       interface{}
+		valueType uint32
+		timefmt   string
+		timezone  string
+		expected  string
+	}{
+		{
+			name:      "nil value returns empty string",
+			val:       nil,
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "",
+		},
+		{
+			name:      "Date formatting",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "yyyy-MM-dd",
+			timezone:  "",
+			expected:  "2021-09-25",
+		},
+		{
+			name:      "Float32 formatting",
+			val:       float32(3.14159),
+			valueType: pgtype.Float4OID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "3.1415901184082",
+		},
+		{
+			name:      "Float64 formatting",
+			val:       float64(1250.75),
+			valueType: pgtype.Float8OID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "1250.75",
+		},
+		{
+			name:      "Array formatting",
+			val:       testArray,
+			valueType: pgtype.TextArrayOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "{pgxport,go,json}",
+		},
+		{
+			name:      "Empty array",
+			val:       []interface{}{},
+			valueType: pgtype.TextArrayOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "{}",
+		},
+		{
+			name:      "String value",
+			val:       "test string",
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "test string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCSVValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			if result != tt.expected {
+				t.Errorf("FormatCSVValue() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatJSONValue(t *testing.T) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		val       interface{}
+		valueType uint32
+		timefmt   string
+		timezone  string
+		expected  interface{}
+	}{
+		{
+			name:      "nil value",
+			val:       nil,
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  nil,
+		},
+		{
+			name:      "Date formatting",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "yyyy-MM-dd",
+			timezone:  "",
+			expected:  "2021-09-25",
+		},
+		{
+			name:      "String value",
+			val:       "test string",
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "test string",
+		},
+		{
+			name:      "Float value kept as number",
+			val:       float64(1250.75),
+			valueType: pgtype.Float8OID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  float64(1250.75),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatJSONValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			if result != tt.expected {
+				t.Errorf("formatJSONValue() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatXMLValue(t *testing.T) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		val       interface{}
+		valueType uint32
+		timefmt   string
+		timezone  string
+		expected  string
+	}{
+		{
+			name:      "nil value returns empty string",
+			val:       nil,
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "",
+		},
+		{
+			name:      "Date formatting",
+			val:       testDate,
+			valueType: pgtype.DateOID,
+			timefmt:   "yyyy-MM-dd",
+			timezone:  "",
+			expected:  "2021-09-25",
+		},
+		{
+			name:      "String value",
+			val:       "test string",
+			valueType: pgtype.TextOID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "test string",
+		},
+		{
+			name:      "Float formatting",
+			val:       float64(1250.75),
+			valueType: pgtype.Float8OID,
+			timefmt:   "",
+			timezone:  "",
+			expected:  "1250.75",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatXMLValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			if result != tt.expected {
+				t.Errorf("formatXMLValue() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatSQLValue(t *testing.T) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+	testTimestamp := time.Date(2024, 3, 15, 14, 30, 45, 123000000, time.UTC)
+	testUUID := [16]byte{0x9f, 0x4d, 0xaf, 0x39, 0x5b, 0x76, 0x4b, 0x9c, 0xa1, 0x47, 0x82, 0x0f, 0x8f, 0x0c, 0x94, 0x5f}
+
+	tests := []struct {
+		name      string
+		value     interface{}
+		valueType uint32
+		expected  string
+	}{
+		{
+			name:      "nil value",
+			value:     nil,
+			valueType: 0,
+			expected:  "NULL",
+		},
+		{
+			name:      "Date with cast",
+			value:     testDate,
+			valueType: pgtype.DateOID,
+			expected:  "'2021-09-25'::date",
+		},
+		{
+			name:      "Timestamp with cast",
+			value:     testTimestamp,
+			valueType: pgtype.TimestampOID,
+			expected:  "'2024-03-15 14:30:45.123'::timestamp",
+		},
+		{
+			name:      "Timestamptz with cast",
+			value:     testTimestamp,
+			valueType: pgtype.TimestamptzOID,
+			expected:  "'2024-03-15 14:30:45.123+00'::timestamptz",
+		},
+		{
+			name:      "UUID with cast",
+			value:     testUUID,
+			valueType: pgtype.UUIDOID,
+			expected:  "'9f4daf39-5b76-4b9c-a147-820f8f0c945f'::uuid",
+		},
+		{
+			name:      "string value",
+			value:     "test string",
+			valueType: pgtype.TextOID,
+			expected:  "'test string'",
+		},
+		{
+			name:      "string with single quote",
+			value:     "O'Brien",
+			valueType: pgtype.TextOID,
+			expected:  "'O''Brien'",
+		},
+		{
+			name:      "string with multiple quotes",
+			value:     "It's a 'test'",
+			valueType: pgtype.TextOID,
+			expected:  "'It''s a ''test'''",
+		},
+		{
+			name:      "bytea value with cast",
+			value:     []byte("binary data"),
+			valueType: pgtype.ByteaOID,
+			expected:  "'binary data'::bytea",
+		},
+		{
+			name:      "bytea with quotes",
+			value:     []byte("O'Connor"),
+			valueType: pgtype.ByteaOID,
+			expected:  "'O''Connor'::bytea",
+		},
+		{
+			name:      "bool true",
+			value:     true,
+			valueType: pgtype.BoolOID,
+			expected:  "true",
+		},
+		{
+			name:      "bool false",
+			value:     false,
+			valueType: pgtype.BoolOID,
+			expected:  "false",
+		},
+		{
+			name:      "int value",
+			value:     int(42),
+			valueType: pgtype.Int4OID,
+			expected:  "42",
+		},
+		{
+			name:      "int64 value",
+			value:     int64(9223372036854775807),
+			valueType: pgtype.Int8OID,
+			expected:  "9223372036854775807",
+		},
+		{
+			name:      "float32 value",
+			value:     float32(3.14159),
+			valueType: pgtype.Float4OID,
+			expected:  "3.1415901184082",
+		},
+		{
+			name:      "float64 value",
+			value:     float64(2.718281828459045),
+			valueType: pgtype.Float8OID,
+			expected:  "2.71828182845905",
+		},
+		{
+			name:      "negative int",
+			value:     int(-42),
+			valueType: pgtype.Int4OID,
+			expected:  "-42",
+		},
+		{
+			name:      "negative float",
+			value:     float64(-3.14),
+			valueType: pgtype.Float4OID,
+			expected:  "-3.14",
+		},
+		{
+			name:      "array value",
+			value:     []interface{}{1, 2, 3},
+			valueType: pgtype.Int4ArrayOID,
+			expected:  "'{1,2,3}'",
+		},
+		{
+			name:      "empty array",
+			value:     []interface{}{},
+			valueType: pgtype.Int4ArrayOID,
+			expected:  "'{}'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatSQLValue(tt.value, tt.valueType)
+			if result != tt.expected {
+				t.Errorf("FormatSQLValue(%v) = %q, want %q", tt.value, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestFormatValueWithDifferentTimezones(t *testing.T) {
 	testTime := time.Date(2024, 3, 15, 14, 30, 45, 0, time.UTC)
 	layout := "2006-01-02 15:04:05"
@@ -176,141 +690,6 @@ func TestFormatValueWithDifferentTimezones(t *testing.T) {
 			result := formatValue(testTime, layout, loc)
 			if result != tt.expected {
 				t.Errorf("formatValue with timezone %s = %v, want %v", tt.timezone, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestFormatSQLValue(t *testing.T) {
-	testTime := time.Date(2024, 3, 15, 14, 30, 45, 123000000, time.UTC)
-
-	tests := []struct {
-		name     string
-		value    interface{}
-		expected string
-	}{
-		{
-			name:     "nil value",
-			value:    nil,
-			expected: "NULL",
-		},
-		{
-			name:     "string value",
-			value:    "test string",
-			expected: "'test string'",
-		},
-		{
-			name:     "string with single quote",
-			value:    "O'Brien",
-			expected: "'O''Brien'",
-		},
-		{
-			name:     "string with multiple quotes",
-			value:    "It's a 'test'",
-			expected: "'It''s a ''test'''",
-		},
-		{
-			name:     "[]byte value",
-			value:    []byte("binary data"),
-			expected: "'binary data'",
-		},
-		{
-			name:     "[]byte with quotes",
-			value:    []byte("O'Connor"),
-			expected: "'O''Connor'",
-		},
-		{
-			name:     "time.Time value",
-			value:    testTime,
-			expected: "'2024-03-15T14:30:45.123'",
-		},
-		{
-			name:     "bool true",
-			value:    true,
-			expected: "true",
-		},
-		{
-			name:     "bool false",
-			value:    false,
-			expected: "false",
-		},
-		{
-			name:     "int value",
-			value:    int(42),
-			expected: "42",
-		},
-		{
-			name:     "int8 value",
-			value:    int8(127),
-			expected: "127",
-		},
-		{
-			name:     "int16 value",
-			value:    int16(32767),
-			expected: "32767",
-		},
-		{
-			name:     "int32 value",
-			value:    int32(2147483647),
-			expected: "2147483647",
-		},
-		{
-			name:     "int64 value",
-			value:    int64(9223372036854775807),
-			expected: "9223372036854775807",
-		},
-		{
-			name:     "uint value",
-			value:    uint(42),
-			expected: "42",
-		},
-		{
-			name:     "uint8 value",
-			value:    uint8(255),
-			expected: "255",
-		},
-		{
-			name:     "uint16 value",
-			value:    uint16(65535),
-			expected: "65535",
-		},
-		{
-			name:     "uint32 value",
-			value:    uint32(4294967295),
-			expected: "4294967295",
-		},
-		{
-			name:     "uint64 value",
-			value:    uint64(18446744073709551615),
-			expected: "18446744073709551615",
-		},
-		{
-			name:     "float32 value",
-			value:    float32(3.14159),
-			expected: "3.1415901184082",
-		},
-		{
-			name:     "float64 value",
-			value:    float64(2.718281828459045),
-			expected: "2.71828182845905",
-		},
-		{
-			name:     "negative int",
-			value:    int(-42),
-			expected: "-42",
-		},
-		{
-			name:     "negative float",
-			value:    float64(-3.14),
-			expected: "-3.14",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := FormatSQLValue(tt.value)
-			if result != tt.expected {
-				t.Errorf("FormatSQLValue(%v) = %q, want %q", tt.value, result, tt.expected)
 			}
 		})
 	}
@@ -363,7 +742,7 @@ func TestQuoteIdent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := QuoteIdent(tt.input)
 			if result != tt.expected {
-				t.Errorf("QuoteIdent(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("quoteIdent(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -447,36 +826,80 @@ func BenchmarkFormatValue(b *testing.B) {
 	})
 }
 
-func BenchmarkFormatSQLValue(b *testing.B) {
-	testTime := time.Date(2024, 3, 15, 14, 30, 45, 123000000, time.UTC)
+func BenchmarkFormatValueByOID(b *testing.B) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+
+	b.Run("date", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			formatValueByOID(testDate, pgtype.DateOID, "yyyy-MM-dd", "")
+		}
+	})
+
+	b.Run("timestamp", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			formatValueByOID(testDate, pgtype.TimestampOID, "yyyy-MM-dd HH:mm:ss", "")
+		}
+	})
 
 	b.Run("string", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			FormatSQLValue("test string")
+			formatValueByOID("test string", pgtype.TextOID, "", "")
+		}
+	})
+}
+
+func BenchmarkFormatCSVValue(b *testing.B) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+
+	b.Run("date", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			FormatCSVValue(testDate, pgtype.DateOID, "yyyy-MM-dd", "")
 		}
 	})
 
-	b.Run("string_with_quotes", func(b *testing.B) {
+	b.Run("string", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			FormatSQLValue("O'Brien's test")
-		}
-	})
-
-	b.Run("int", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			FormatSQLValue(42)
+			FormatCSVValue("test string", pgtype.TextOID, "", "")
 		}
 	})
 
 	b.Run("float", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			FormatSQLValue(3.14159)
+			FormatCSVValue(3.14159, pgtype.Float4OID, "", "")
+		}
+	})
+}
+
+func BenchmarkFormatSQLValue(b *testing.B) {
+	testDate := time.Date(2021, 9, 25, 0, 0, 0, 0, time.UTC)
+
+	b.Run("string", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			FormatSQLValue("test string", pgtype.TextOID)
 		}
 	})
 
-	b.Run("time", func(b *testing.B) {
+	b.Run("string_with_quotes", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			FormatSQLValue(testTime)
+			FormatSQLValue("O'Brien's test", pgtype.TextOID)
+		}
+	})
+
+	b.Run("int", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			FormatSQLValue(42, pgtype.Int4OID)
+		}
+	})
+
+	b.Run("float", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			FormatSQLValue(3.14159, pgtype.Float4OID)
+		}
+	})
+
+	b.Run("date", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			FormatSQLValue(testDate, pgtype.DateOID)
 		}
 	})
 }

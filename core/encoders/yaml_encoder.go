@@ -1,27 +1,24 @@
 package encoders
 
 import (
-	"time"
-
 	"github.com/fbz-tec/pgxport/core/formatters"
 	"gopkg.in/yaml.v3"
 )
 
 type OrderedYamlEncoder struct {
 	timeLayout string
-	timezone   *time.Location
+	timezone   string
 }
 
 func NewOrderedYamlEncoder(timeFormat, timeZone string) OrderedYamlEncoder {
-	layout, loc := formatters.UserTimeZoneFormat(timeFormat, timeZone)
 	return OrderedYamlEncoder{
-		timeLayout: layout,
-		timezone:   loc,
+		timeLayout: timeFormat,
+		timezone:   timeZone,
 	}
 }
 
 // EncodeRow builds a YAML mapping node (one record).
-func (o OrderedYamlEncoder) EncodeRow(keys []string, values []interface{}) (*yaml.Node, error) {
+func (o OrderedYamlEncoder) EncodeRow(keys []string, dataTypes []uint32, values []interface{}) (*yaml.Node, error) {
 
 	row := &yaml.Node{
 		Kind: yaml.MappingNode,
@@ -33,7 +30,7 @@ func (o OrderedYamlEncoder) EncodeRow(keys []string, values []interface{}) (*yam
 			Value: key,
 		}
 
-		val := formatters.FormatYAMLValue(values[i], o.timeLayout, o.timezone)
+		val := formatters.FormatYAMLValue(values[i], dataTypes[i], o.timeLayout, o.timezone)
 		valueNode := &yaml.Node{}
 		if err := valueNode.Encode(val); err != nil {
 			return nil, err

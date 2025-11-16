@@ -28,10 +28,12 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 	defer bufferedWriter.Flush()
 
 	// Get column names (keys)
-	fieldDescriptions := rows.FieldDescriptions()
-	keys := make([]string, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
+	fields := rows.FieldDescriptions()
+	keys := make([]string, len(fields))
+	dataTypes := make([]uint32, len(fields))
+	for i, fd := range fields {
 		keys[i] = string(fd.Name)
+		dataTypes[i] = fd.DataTypeOID
 	}
 
 	// Write opening bracket
@@ -59,7 +61,7 @@ func (e *jsonExporter) Export(rows pgx.Rows, jsonPath string, options ExportOpti
 		}
 
 		// Encode with preserved order
-		jsonBytes, err := orderedEncoder.EncodeRow(keys, values)
+		jsonBytes, err := orderedEncoder.EncodeRow(keys, dataTypes, values)
 		if err != nil {
 			return rowCount, fmt.Errorf("error encoding JSON for row %d: %w", rowCount, err)
 		}

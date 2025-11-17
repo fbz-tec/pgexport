@@ -40,6 +40,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - 🗜️ Compression: **gzip** / **zip** 
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 DSN connection string support (`--dsn`)
+- 🔗 **Individual connection flags** for maximum flexibility
 - 🛡️ Robust error handling and validation
 - ⚠️ Fail on empty results (`--fail-on-empty`) for scripts & pipelines
 - 🔍 Verbose mode for detailed logging
@@ -116,15 +117,36 @@ Pass the connection string directly via command line:
 ```bash
 pgxport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
 ```
+### Option 4: Using Individual Connection Flags
+
+For maximum flexibility, specify each connection parameter individually:
+```bash
+pgxport --user postgres --host localhost --port 5432 --database mydb --password secret \
+        -s "SELECT * FROM users" -o users.csv
+```
+
+**Available flags:**
+- `--host` : Database host
+- `--port` : Database port
+- `--user` : Database username  
+- `--database` : Database name
+- `--password` : Database password
+
+**Advantages:**
+- ✅ Mix with `.env` file (override only what you need)
+- ✅ Compatible with shell variables
+- ✅ Fine-grained control over each parameter
+- ✅ Perfect for CI/CD and scripting
 
 ### Configuration Priority
 
 The system uses the following priority order:
 
-1. `--dsn`
-2. Environment variables
-3. `.env` file
-4. Defaults
+1. **Individual connection flags** (`--host`, `--port`, `--user`, `--database`, `--password`)
+2. **`--dsn` flag**
+3. **Environment variables** (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_NAME`, `DB_PASS`)
+4. **`.env` file**
+5. **Defaults**
 
 ## 📖 Usage
 
@@ -162,6 +184,11 @@ pgxport [command] [flags]
 | `--dsn` | - | Database connection string | - | No |
 | `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
 | `--help` | `-h` | Show help message | - | No |
+| `--host` |- | Database host | `localhost` | No* |
+| `--port` |- | Database port | `5432` | No* |
+| `--user` |- | Database username | - | No* |
+| `--database` |- | Database name | - | No* |
+| `--password` |- | Database password | - | No* |
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 
@@ -894,7 +921,11 @@ go vet ./...
    - For production, use environment variables or secrets management
 
 2. **Avoid passwords in command line**:
+   - ❌ Bad: Password visible in process list
+   pgxport --password mysecret --user user --host db.com --database mydb ...
    - ❌ Bad: `pgxport --dsn "postgres://user:password123@host/db" ...` (visible in history)
+   - ✅ Good: Use environment variable
+   export PGPASSWORD=mysecret
    - ✅ Good: Use `.env` file or environment variables
    - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgxport --dsn "$DATABASE_URL" ...`
 
@@ -963,7 +994,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - COPY mode  
 - Streaming + compression  
 - Fail-on-empty mode  
-- Batch SQL inserts  
+- Batch SQL inserts
+- Individual connection flags  
 
 ### 🚧 Planned
 - [ ] Excel (XLSX) export  

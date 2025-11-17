@@ -183,6 +183,7 @@ pgxport [command] [flags]
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | - | Database connection string | - | No |
 | `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
+| `--quiet` | `-q` | Suppress all output except errors | `false` | No |
 | `--help` | `-h` | Show help message | - | No |
 | `--host` |- | Database host | `localhost` | No* |
 | `--port` |- | Database port | `5432` | No* |
@@ -210,6 +211,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 - `--time-zone` - Timezone conversion
 - `--fail-on-empty` - Fail if query returns 0 rows
 - `--verbose` - Detailed logging
+- `--quiet` - Suppress all output except errors
 
 ### Format-Specific Flags
 
@@ -995,7 +997,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Streaming + compression  
 - Fail-on-empty mode  
 - Batch SQL inserts
-- Individual connection flags  
+- Individual connection flags
+- Quiet mode
+
 
 ### 🚧 Planned
 - [ ] Excel (XLSX) export  

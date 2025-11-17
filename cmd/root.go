@@ -33,6 +33,7 @@ var (
 	failOnEmpty     bool
 	noHeader        bool
 	verbose         bool
+	quiet           bool
 	rowPerStatement int
 	// Connection flags
 	dbHost     string
@@ -97,6 +98,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&xmlRowElement, "xml-row-tag", "", "row", "Sets the row element name for XML exports")
 	rootCmd.Flags().IntVarP(&rowPerStatement, "insert-batch", "", 1, "Number of rows per INSERT statement in SQL export")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
+	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 
 	// Connection flags (PostgreSQL-compatible)
 	rootCmd.Flags().StringVar(&dbHost, "host", "", "Database host (overrides .env and environment)")
@@ -108,10 +110,20 @@ func init() {
 	rootCmd.MarkFlagRequired("output")
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		logger.SetVerbose(verbose)
-		if verbose {
-			logger.Debug("Verbose mode enabled")
+		if verbose && quiet {
+			logger.Error("Cannot use --verbose and --quiet flags together")
+			os.Exit(1)
 		}
+		if quiet {
+			logger.SetQuiet(true)
+			logger.SetVerbose(false)
+		} else {
+			logger.SetVerbose(verbose)
+			if verbose {
+				logger.Debug("Verbose mode enabled")
+			}
+		}
+
 	}
 
 	rootCmd.AddCommand(versionCmd)

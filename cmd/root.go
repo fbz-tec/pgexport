@@ -34,6 +34,12 @@ var (
 	noHeader        bool
 	verbose         bool
 	rowPerStatement int
+	// Connection flags
+	dbHost     string
+	dbPort     string
+	dbUser     string
+	dbName     string
+	dbPassword string
 )
 
 var rootCmd = &cobra.Command{
@@ -92,6 +98,13 @@ func init() {
 	rootCmd.Flags().IntVarP(&rowPerStatement, "insert-batch", "", 1, "Number of rows per INSERT statement in SQL export")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 
+	// Connection flags (PostgreSQL-compatible)
+	rootCmd.Flags().StringVar(&dbHost, "host", "", "Database host (overrides .env and environment)")
+	rootCmd.Flags().StringVar(&dbPort, "port", "", "Database port (overrides .env and environment)")
+	rootCmd.Flags().StringVar(&dbUser, "user", "", "Database username (overrides .env and environment)")
+	rootCmd.Flags().StringVar(&dbName, "database", "", "Database name (overrides .env and environment)")
+	rootCmd.Flags().StringVar(&dbPassword, "password", "", "Database password (overrides .env and environment)")
+
 	rootCmd.MarkFlagRequired("output")
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -130,8 +143,29 @@ func runExport(cmd *cobra.Command, args []string) error {
 		logger.Debug("Using connection string from --dsn flag")
 		dbUrl = connString
 	} else {
-		logger.Debug("Loading configuration from environment")
+		logger.Debug("Loading configuration from environment and flags")
 		cfg := config.LoadConfig()
+		if dbHost != "" {
+			cfg.DBHost = dbHost
+			logger.Debug("Overriding DB host from flag: %s", dbHost)
+		}
+		if dbPort != "" {
+			cfg.DBPort = dbPort
+			logger.Debug("Overriding DB port from flag: %s", dbPort)
+		}
+		if dbUser != "" {
+			cfg.DBUser = dbUser
+			logger.Debug("Overriding DB user from flag: %s", dbUser)
+		}
+		if dbName != "" {
+			cfg.DBName = dbName
+			logger.Debug("Overriding DB name from flag: %s", dbName)
+		}
+		if dbPassword != "" {
+			cfg.DBPass = dbPassword
+			logger.Debug("Overriding DB password from flag (hidden)")
+		}
+
 		if err := cfg.Validate(); err != nil {
 			return fmt.Errorf("configuration error: %w", err)
 		}

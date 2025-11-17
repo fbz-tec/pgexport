@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/fbz-tec/pgxport)](https://goreportcard.com/report/github.com/fbz-tec/pgxport)
 [![License](https://img.shields.io/github/license/fbz-tec/pgxport.svg)](LICENSE)
 
-A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON, SQL).
+A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON ,YAML ,SQL).
 
 ---
 
@@ -34,7 +34,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to **CSV**, **JSON**, **XML**, and **SQL** 
+- 📊 Export to **CSV**, **JSON**, **XML**, **YAML** and **SQL** 
 - ⚡ High-performance CSV export using PostgreSQL native **COPY** mode (`--with-copy`)
 - 🔧 Customizable CSV delimiter and header
 - 🗜️ Compression: **gzip** / **zip** 
@@ -147,7 +147,7 @@ pgxport [command] [flags]
 | `--sql` | `-s` | SQL query to execute | - | * |
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
-| `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
+| `--format` | `-f` | Output format (csv, json, yaml, xml, sql) | `csv` | No |
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-d` | CSV delimiter character | `,` | No |
@@ -174,6 +174,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | CSV | ✅ | ✅ | ✅ |
 | JSON | ✅ | ✅ | ❌ |
 | XML | ✅ | ✅ | ❌ |
+| YAML | ✅ | ✅ | ❌ |
 | SQL | ✅ | ✅ | ❌ |
 
 ### Common Flags (All Formats)
@@ -191,6 +192,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | **XML** | `--xml-root-tag`<br>`--xml-row-tag` | Customize root element name<br>Customize row element name |
 | **SQL** | `--table`<br>`--insert-batch` | Target table name (required)<br>Rows per INSERT statement |
 | **JSON** | *(none)* | Uses only common flags |
+| **YAML** | *(none)* | Uses only common flags |
 
 ### Examples
 
@@ -226,6 +228,9 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
 # Export to SQL INSERT statements with schema
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_backup
+
+# Export to YAML format
+pgxport -s "SELECT * FROM products" -o products.yaml -f yaml
 
 # Export with gzip compression
 pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
@@ -419,6 +424,7 @@ pgxport --dsn "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
 # Export same data in different formats
 pgxport -s "SELECT * FROM products" -o products.csv -f csv
 pgxport -s "SELECT * FROM products" -o products.json -f json
+pgxport -s "SELECT * FROM products" -o products.yaml -f yaml
 pgxport -s "SELECT * FROM products" -o products.xml -f xml
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
@@ -560,6 +566,39 @@ pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
   }
 ]
 ```
+### YAML
+
+- Pretty-printed with 2-space indentation
+- Array format with `-` list items
+- **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
+- **Timezone**: Local system time (customizable with `--time-zone`)
+- NULL values preserved as `null`
+
+**Example output:**
+```yaml
+- id: 1
+  name: John Doe
+  email: john@example.com
+  created_at: "2024-01-15 10:30:00"
+- id: 2
+  name: Jane Smith
+  email: jane@example.com
+  created_at: "2024-01-16 14:22:15"
+```
+**YAML Format Features:**
+- ✅ **Human-readable**: Clean, indented structure easy to read and edit
+- ✅ **Configuration-friendly**: Ideal for configuration files and data interchange
+- ✅ **Preserves column order**: Maintains the exact order of columns from the query
+- ✅ **Type preservation**: Numbers, booleans, strings, and nulls are properly typed
+- ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL
+- ✅ **Automatic quoting**: Strings that need quoting are automatically wrapped
+- ✅ **Null handling**: NULL values exported as YAML `null`
+
+**Use cases:**
+- 📋 Configuration files
+- 📊 Data interchange between systems
+- 🔍 Human-readable data exports
+- 🧪 Test fixtures and mock data
 
 ### XML
 
@@ -626,47 +665,67 @@ INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
 
 ```
 pgxport/
-├── cmd/                     # CLI entry points
-│   ├── root.go              # Main command + flags
-│   ├── root_test.go
-│   └── version.go           # Version subcommand
+├── 📜 CHANGELOG.md           # Version history and release notes
+├── 📁 cmd/                   # CLI entry points
+│   ├── 📄 root.go            # Main command + flags
+│   ├── 📄 root_test.go
+│   └── 📄 version.go         # Version subcommand
 │
-├── core/                    # Business logic
-│   ├── exporter/            # Export formats (pluggable)
-│   │   ├── registry.go      # Format registration system
-│   │   ├── formatting.go    # Shared formatting utilities
-│   │   ├── compression.go   # Compression support (gzip/zip)
-│   │   ├── options.go       # Export options struct
-│   │   ├── testing_helpers.go
-│   │   ├── csv_exporter.go  # CSV export implementation
-│   │   ├── json_exporter.go # JSON export implementation
-│   │   ├── xml_exporter.go  # XML export implementation
-│   │   └── sql_exporter.go  # SQL export implementation
+├── 📁 core/                  # Business logic
+│   ├── 📁 config/            # Configuration management
+│   │   ├── 📄 config.go      # Config loading with validation
+│   │   └── 📄 config_test.go
 │   │
-│   ├── db/            # Database operations
-│   │   ├── connection.go    # PostgreSQL connection management
-│   │   └── connection_test.go
+│   ├── 📁 db/                # Database operations
+│   │   ├── 📄 connection.go  # PostgreSQL connection management
+│   │   └── 📄 connection_test.go
 │   │
-│   ├── config/              # Configuration management
-│   │   ├── config.go        # Config loading with validation
-│   │   └── config_test.go
+│   ├── 📁 encoders/          # Row encoding strategies
+│   │   ├── 📄 json_encoder.go # JSON row encoder
+│   │   └── 📄 yaml_encoder.go # YAML row encoder
 │   │
-│   └── validation/          # Input validation
-│       ├── query_safety.go  # Query and parameter validation
-│       └── query_safety_test.go
+│   ├── 📁 exporters/         # Export format implementations
+│   │   ├── 📄 exporter.go    # Exporter interface
+│   │   ├── 📄 registry.go    # Format registration system
+│   │   ├── 📄 compression.go # Compression support (gzip/zip)
+│   │   ├── 📄 compression_test.go
+│   │   ├── 📄 csv_exporter.go  # CSV export implementation
+│   │   ├── 📄 csv_exporter_test.go
+│   │   ├── 📄 json_exporter.go # JSON export implementation
+│   │   ├── 📄 json_exporter_test.go
+│   │   ├── 📄 xml_exporter.go  # XML export implementation
+│   │   ├── 📄 xml_exporter_test.go
+│   │   ├── 📄 yaml_exporter.go # YAML export implementation
+│   │   ├── 📄 sql_exporter.go  # SQL export implementation
+│   │   ├── 📄 sql_exporter_test.go
+│   │   └── 📄 testing_helpers.go
+│   │
+│   ├── 📁 formatters/        # Data type formatting
+│   │   ├── 📄 formatting.go  # Shared formatting utilities
+│   │   └── 📄 formatting_test.go
+│   │
+│   └── 📁 validation/        # Input validation
+│       ├── 📄 query_safety.go      # Query and parameter validation
+│       ├── 📄 query_safety_test.go
+│       ├── 📄 validate_data.go     # Data validation
+│       └── 📄 validate_data_test.go
 │
-├── internal/                # Private packages
-│   ├── logger/              # Logging utilities
-│   │   └── logger.go        # Structured logging with verbose mode
-│   └── version/             # Build information
-│       └── version.go       # Version, BuildTime, GitCommit
+├── 📁 internal/              # Private packages
+│   ├── 📁 logger/            # Logging utilities
+│   │   └── 📄 logger.go      # Structured logging with verbose mode
+│   └── 📁 version/           # Build information
+│       └── 📄 version.go     # Version, BuildTime, GitCommit
 │
-├── main.go                  # Application entry point
-├── go.mod                   # Go module definition
-├── go.sum                   # Go module checksums
-├── Taskfile.yml             # Build automation
-├── LICENSE                  # MIT license
-└── README.md                # This file
+├── 📁 test/                  # Test resources
+│   └── 📄 init.sql           # Test database initialization
+│
+├── 📄 docker-compose.yml     # Docker setup for testing
+├── 📄 go.mod                 # Go module definition
+├── 📄 go.sum                 # Go module checksums
+├── 📄 LICENSE                # MIT license
+├── 📄 main.go                # Application entry point
+├── 📜 README.md              # This file
+└── 📄 Taskfile.yml           # Build automation
 ```
 
 ## 🧩 Architecture
@@ -675,24 +734,25 @@ The project follows a clean, layered architecture with clear separation of conce
 
 ```mermaid
 flowchart TD
-  A[CLI - Cobra] --> B[cmd/root.go<br/>Command Handler]
-  B --> C[core/config<br/>Configuration]
-  B --> D[core/db<br/>DB Connection]
-  B --> E[core/exporter<br/>Export Logic]
+ A[CLI - Cobra] --> B[cmd/root.goCommand Handler]
+  B --> C[core/configConfiguration]
+  B --> D[core/dbDB Connection]
+  B --> E[core/exporterExport Logic]
   
-  E --> E0[registry.go<br/>Format Registry]
+  E --> E0[registry.goFormat Registry]
   E0 --> E1[CSV Exporter]
   E0 --> E2[JSON Exporter]
   E0 --> E3[XML Exporter]
-  E0 --> E4[SQL Exporter]
+  E0 --> E4[YAML Exporter]
+  E0 --> E5[SQL Exporter]
   
-  E --> F[formatting.go<br/>Shared Utils]
-  E --> G[compression.go<br/>gzip/zip]
+  E --> F[formatting.goShared Utils]
+  E --> G[compression.gogzip/zip]
   
-  B --> H[internal/logger<br/>Logging]
-  B --> I[internal/version<br/>Build Info]
+  B --> H[internal/loggerLogging]
+  B --> I[internal/versionBuild Info]
   
-  D --> J[core/validation<br/>Query Safety]
+  D --> J[core/validationQuery Safety]
   
   style B fill:#e1f5ff
   style E fill:#ffe1f5
@@ -706,41 +766,6 @@ flowchart TD
 - **Pluggable Exporters**: Registry pattern allows easy addition of new formats
 - **SOLID Principles**: Each package has a single, well-defined responsibility
 - **Testability**: Modular design facilitates comprehensive testing
-
-**Component Descriptions:**
-
-### CLI Layer (`cmd/`)
-- **`root.go`**: Main command orchestration with Cobra framework
-- **`version.go`**: Version information subcommand
-
-### Core Business Logic (`core/`)
-
-**`exporter/`** - Export format implementations
-- **`registry.go`**: Dynamic format registration using factory pattern
-- **`formatting.go`**: Shared formatting utilities (dates, escaping, etc.)
-- **`compression.go`**: Output compression (gzip, zip)
-- **`options.go`**: Export configuration options
-- **`csv_exporter.go`**: CSV format with COPY mode support
-- **`json_exporter.go`**: JSON array format
-- **`xml_exporter.go`**: XML format with customizable tags
-- **`sql_exporter.go`**: SQL INSERT statements with batch support
-
-**`db/`** - PostgreSQL operations
-- **`connection.go`**: Database connection management and query execution
-
-**`config/`** - Application configuration
-- **`config.go`**: Configuration loading with `.env` support and validation
-
-**`validation/`** - Input validation
-- **`query_safety.go`**: Query and parameter validation
-
-### Internal Utilities (`internal/`)
-
-**`logger/`** - Structured logging
-- **`logger.go`**: Logger implementation with verbose mode support
-
-**`version/`** - Build metadata
-- **`version.go`**: Version information set via ldflags during build
 
 ### Key Design Patterns
 
@@ -934,7 +959,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### ✅ Completed
 - `.env` configuration  
 - `--dsn` flag  
-- XML / JSON / SQL exporters  
+- XML / JSON / SQL / JSON exporters  
 - COPY mode  
 - Streaming + compression  
 - Fail-on-empty mode  

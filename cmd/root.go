@@ -81,29 +81,44 @@ Supported output formats:
 }
 
 func init() {
+	rootCmd.Flags().SortFlags = false
+
 	// Connection flags (PostgreSQL-compatible)
 	rootCmd.Flags().StringVarP(&dbHost, "host", "H", "", "Database host (overrides .env and environment)")
 	rootCmd.Flags().IntVarP(&dbPort, "port", "P", 5432, "Database port (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbUser, "user", "u", "", "Database username (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbName, "database", "d", "", "Database name (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbPassword, "password", "p", "", "Database password (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 
+	//QUERY INPUT - what to export
 	rootCmd.Flags().StringVarP(&sqlQuery, "sql", "s", "", "SQL query to execute")
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
+
+	// OUTPUT DESTINATION - where and how to export
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
-	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
-	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
-	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
-	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
-	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
+
+	// CSV options
+	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
 	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
-	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVarP(&noHeader, "no-header", "n", false, "Skip header row in CSV output")
+
+	// XML options
 	rootCmd.Flags().StringVarP(&xmlRootElement, "xml-root-tag", "", "results", "Sets the root element name for XML exports")
 	rootCmd.Flags().StringVarP(&xmlRowElement, "xml-row-tag", "", "row", "Sets the row element name for XML exports")
+
+	// SQL options
+	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().IntVarP(&rowPerStatement, "insert-batch", "", 1, "Number of rows per INSERT statement in SQL export")
+
+	// Date FORMATTING
+	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
+	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
+
+	// BEHAVIOR OPTIONS
+	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 

@@ -16,8 +16,6 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - [📊 Output Formats](#-output-formats)
 - [🔍 Verbose Mode](#-verbose-mode)
 - [📄 Format Details](#-format-details)
-- [🗃️ Project Structure](#️-project-structure)
-- [🧩 Architecture](#-architecture)
 - [🛠️ Development](#️-development)
 - [🔒 Security](#-security)
 - [🚨 Error Handling](#-error-handling)
@@ -150,7 +148,7 @@ pgxport [command] [flags]
 | `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
-| `--delimiter` | `-d` | CSV delimiter character | `,` | No |
+| `--delimiter` | `-D` | CSV delimiter character | `,` | No |
 | `--no-header` | - | Skip CSV header row in output | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
@@ -201,7 +199,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
 # Export with semicolon delimiter
-pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
+pgxport -s "SELECT id, name, email FROM users" -o users.csv -D ';'
 
 # Skip header row with --no-header
 pgxport -s "SELECT id, name, email FROM users" -o users.csv -f csv --no-header
@@ -383,7 +381,7 @@ LEFT JOIN orders o ON u.id = o.user_id
 GROUP BY u.id, u.username 
 HAVING COUNT(o.id) > 0
 ORDER BY total_revenue DESC
-" -o user_stats.csv -d ','
+" -o user_stats.csv -D ','
 
 # Export with timestamp in filename
 pgxport -s "SELECT * FROM logs WHERE created_at > NOW() - INTERVAL '24 hours'" \
@@ -621,133 +619,6 @@ INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
 - ✅ **Type-aware formatting**: Numbers and booleans without quotes, strings and dates with quotes
 - ✅ **NULL handling**: NULL values exported as SQL `NULL` keyword
 - ✅ **Ready to import**: Generated SQL can be directly executed on any PostgreSQL database
-
-## 🗃️ Project Structure
-
-```
-pgxport/
-├── cmd/                     # CLI entry points
-│   ├── root.go              # Main command + flags
-│   ├── root_test.go
-│   └── version.go           # Version subcommand
-│
-├── core/                    # Business logic
-│   ├── exporter/            # Export formats (pluggable)
-│   │   ├── registry.go      # Format registration system
-│   │   ├── formatting.go    # Shared formatting utilities
-│   │   ├── compression.go   # Compression support (gzip/zip)
-│   │   ├── options.go       # Export options struct
-│   │   ├── testing_helpers.go
-│   │   ├── csv_exporter.go  # CSV export implementation
-│   │   ├── json_exporter.go # JSON export implementation
-│   │   ├── xml_exporter.go  # XML export implementation
-│   │   └── sql_exporter.go  # SQL export implementation
-│   │
-│   ├── db/            # Database operations
-│   │   ├── connection.go    # PostgreSQL connection management
-│   │   └── connection_test.go
-│   │
-│   ├── config/              # Configuration management
-│   │   ├── config.go        # Config loading with validation
-│   │   └── config_test.go
-│   │
-│   └── validation/          # Input validation
-│       ├── query_safety.go  # Query and parameter validation
-│       └── query_safety_test.go
-│
-├── internal/                # Private packages
-│   ├── logger/              # Logging utilities
-│   │   └── logger.go        # Structured logging with verbose mode
-│   └── version/             # Build information
-│       └── version.go       # Version, BuildTime, GitCommit
-│
-├── main.go                  # Application entry point
-├── go.mod                   # Go module definition
-├── go.sum                   # Go module checksums
-├── Taskfile.yml             # Build automation
-├── LICENSE                  # MIT license
-└── README.md                # This file
-```
-
-## 🧩 Architecture
-
-The project follows a clean, layered architecture with clear separation of concerns:
-
-```mermaid
-flowchart TD
-  A[CLI - Cobra] --> B[cmd/root.go<br/>Command Handler]
-  B --> C[core/config<br/>Configuration]
-  B --> D[core/db<br/>DB Connection]
-  B --> E[core/exporter<br/>Export Logic]
-  
-  E --> E0[registry.go<br/>Format Registry]
-  E0 --> E1[CSV Exporter]
-  E0 --> E2[JSON Exporter]
-  E0 --> E3[XML Exporter]
-  E0 --> E4[SQL Exporter]
-  
-  E --> F[formatting.go<br/>Shared Utils]
-  E --> G[compression.go<br/>gzip/zip]
-  
-  B --> H[internal/logger<br/>Logging]
-  B --> I[internal/version<br/>Build Info]
-  
-  D --> J[core/validation<br/>Query Safety]
-  
-  style B fill:#e1f5ff
-  style E fill:#ffe1f5
-  style D fill:#f5ffe1
-  style C fill:#fff4e1
-```
-
-**Architecture Principles:**
-
-- **Layered Structure**: Clear separation between CLI, business logic, and utilities
-- **Pluggable Exporters**: Registry pattern allows easy addition of new formats
-- **SOLID Principles**: Each package has a single, well-defined responsibility
-- **Testability**: Modular design facilitates comprehensive testing
-
-**Component Descriptions:**
-
-### CLI Layer (`cmd/`)
-- **`root.go`**: Main command orchestration with Cobra framework
-- **`version.go`**: Version information subcommand
-
-### Core Business Logic (`core/`)
-
-**`exporter/`** - Export format implementations
-- **`registry.go`**: Dynamic format registration using factory pattern
-- **`formatting.go`**: Shared formatting utilities (dates, escaping, etc.)
-- **`compression.go`**: Output compression (gzip, zip)
-- **`options.go`**: Export configuration options
-- **`csv_exporter.go`**: CSV format with COPY mode support
-- **`json_exporter.go`**: JSON array format
-- **`xml_exporter.go`**: XML format with customizable tags
-- **`sql_exporter.go`**: SQL INSERT statements with batch support
-
-**`db/`** - PostgreSQL operations
-- **`connection.go`**: Database connection management and query execution
-
-**`config/`** - Application configuration
-- **`config.go`**: Configuration loading with `.env` support and validation
-
-**`validation/`** - Input validation
-- **`query_safety.go`**: Query and parameter validation
-
-### Internal Utilities (`internal/`)
-
-**`logger/`** - Structured logging
-- **`logger.go`**: Logger implementation with verbose mode support
-
-**`version/`** - Build metadata
-- **`version.go`**: Version information set via ldflags during build
-
-### Key Design Patterns
-
-1. **Registry Pattern**: Exporters self-register at init time, enabling dynamic format support
-2. **Factory Pattern**: Each export creates a fresh instance, avoiding state sharing
-3. **Strategy Pattern**: Exporters implement a common interface for interchangeable behavior
-4. **Dependency Injection**: Components receive dependencies rather than creating them
 
 ## 🛠️ Development
 

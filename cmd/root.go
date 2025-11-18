@@ -51,7 +51,7 @@ Supported output formats:
   pgxport -s "SELECT * FROM users" -o users.csv
 
   # Export from SQL file with custom delimiter
-  pgxport -F query.sql -o output.csv -d ";"
+  pgxport -F query.sql -o output.csv -D ";"
 
   # Use the high-performance COPY mode for large CSV exports
   pgxport -s "SELECT * FROM events" -o events.csv -f csv --with-copy
@@ -76,7 +76,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
 	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
 	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
-	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
+	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
 	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")

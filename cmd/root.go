@@ -59,7 +59,7 @@ Supported output formats:
   pgxport -s "SELECT * FROM users" -o users.csv
 
   # Export from SQL file with custom delimiter
-  pgxport -F query.sql -o output.csv -d ";"
+  pgxport -F query.sql -o output.csv -D ";"
 
   # Use the high-performance COPY mode for large CSV exports
   pgxport -s "SELECT * FROM events" -o events.csv -f csv --with-copy
@@ -81,13 +81,20 @@ Supported output formats:
 }
 
 func init() {
+	// Connection flags (PostgreSQL-compatible)
+	rootCmd.Flags().StringVarP(&dbHost, "host", "H", "", "Database host (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbPort, "port", "P", "", "Database port (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbUser, "user", "u", "", "Database username (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbName, "database", "d", "", "Database name (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbPassword, "password", "p", "", "Database password (overrides .env and environment)")
+
 	rootCmd.Flags().StringVarP(&sqlQuery, "sql", "s", "", "SQL query to execute")
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
 	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
 	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
-	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "d", ",", "CSV delimiter character")
+	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
 	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
 	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
@@ -100,20 +107,15 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 
-	// Connection flags (PostgreSQL-compatible)
-	rootCmd.Flags().StringVar(&dbHost, "host", "", "Database host (overrides .env and environment)")
-	rootCmd.Flags().StringVar(&dbPort, "port", "", "Database port (overrides .env and environment)")
-	rootCmd.Flags().StringVar(&dbUser, "user", "", "Database username (overrides .env and environment)")
-	rootCmd.Flags().StringVar(&dbName, "database", "", "Database name (overrides .env and environment)")
-	rootCmd.Flags().StringVar(&dbPassword, "password", "", "Database password (overrides .env and environment)")
-
 	rootCmd.MarkFlagRequired("output")
 
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		if verbose && quiet {
-			logger.Error("Cannot use --verbose and --quiet flags together")
+	rootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		logger.Debug("Validating export parameters")
+		if err := validateExportParams(); err != nil {
+			logger.Error(err.Error())
 			os.Exit(1)
 		}
+		logger.Debug("Export parameters validated successfully")
 		if quiet {
 			logger.SetQuiet(true)
 			logger.SetVerbose(false)
@@ -141,14 +143,6 @@ func runExport(cmd *cobra.Command, args []string) error {
 
 	logger.Debug("Initializing pgxport execution environment")
 	logger.Debug("Version: %s, Build: %s, Commit: %s", version.AppVersion, version.BuildTime, version.GitCommit)
-
-	logger.Debug("Validating export parameters")
-
-	if err := validateExportParams(); err != nil {
-		return err
-	}
-
-	logger.Debug("Export parameters validated successfully")
 
 	var dbUrl string
 	if connString != "" {
@@ -272,6 +266,10 @@ func runExport(cmd *cobra.Command, args []string) error {
 }
 
 func validateExportParams() error {
+
+	if verbose && quiet {
+		return fmt.Errorf("error: Cannot use --verbose and --quiet flags together")
+	}
 	// Validate SQL query source
 	if sqlQuery == "" && sqlFile == "" {
 		return fmt.Errorf("error: Either --sql or --sqlfile must be provided")

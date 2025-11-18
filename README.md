@@ -16,8 +16,6 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 - [📊 Output Formats](#-output-formats)
 - [🔍 Verbose Mode](#-verbose-mode)
 - [📄 Format Details](#-format-details)
-- [🗃️ Project Structure](#️-project-structure)
-- [🧩 Architecture](#-architecture)
 - [🛠️ Development](#️-development)
 - [🔒 Security](#-security)
 - [🚨 Error Handling](#-error-handling)
@@ -52,7 +50,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 ### Prerequisites
 
-- Go 1.19 or higher
+- Go 1.20 or higher
 - PostgreSQL database access
 
 ### Option 1: Install via `go install` (Recommended)
@@ -172,7 +170,7 @@ pgxport [command] [flags]
 | `--format` | `-f` | Output format (csv, json, yaml, xml, sql) | `csv` | No |
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
-| `--delimiter` | `-d` | CSV delimiter character | `,` | No |
+| `--delimiter` | `-D` | CSV delimiter character | `,` | No |
 | `--no-header` | `-n` | Skip CSV header row in output | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
@@ -185,11 +183,11 @@ pgxport [command] [flags]
 | `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
 | `--quiet` | `-q` | Suppress all output except errors | `false` | No |
 | `--help` | `-h` | Show help message | - | No |
-| `--host` |- | Database host | `localhost` | No* |
-| `--port` |- | Database port | `5432` | No* |
-| `--user` |- | Database username | - | No* |
-| `--database` |- | Database name | - | No* |
-| `--password` |- | Database password | - | No* |
+| `--host` |`-H` | Database host | `localhost` | No* |
+| `--port` |`-P` | Database port | `5432` | No* |
+| `--user` |`-u`| Database username | - | No* |
+| `--database` |`-d` | Database name | - | No* |
+| `--password` |`-p` | Database password | - | No* |
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 
@@ -232,7 +230,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 pgxport -s "SELECT * FROM users WHERE active = true" -o users.csv
 
 # Export with semicolon delimiter
-pgxport -s "SELECT id, name, email FROM users" -o users.csv -d ';'
+pgxport -s "SELECT id, name, email FROM users" -o users.csv -D ';'
 
 # Skip header row with --no-header
 pgxport -s "SELECT id, name, email FROM users" -o users.csv -f csv --no-header
@@ -269,20 +267,6 @@ pgxport -s "SELECT * FROM logs" -o logs.zip -f csv -z zip
 
 # Check version
 pgxport version
-```
-
-#### Using Connection String
-
-```bash
-# Long form
-pgxport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
-         -s "SELECT * FROM users LIMIT 5" \
-         -o users.csv
-
-# Override .env with different database
-pgxport --dsn "postgres://readonly:pass@replica:5432/mydb" \
-         -s "SELECT * FROM large_table" \
-         -o export.csv
 ```
 
 #### Handling Empty Results
@@ -690,118 +674,6 @@ INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
 - ✅ **NULL handling**: NULL values exported as SQL `NULL` keyword
 - ✅ **Ready to import**: Generated SQL can be directly executed on any PostgreSQL database
 
-## 🗃️ Project Structure
-
-```
-pgxport/
-├── 📜 CHANGELOG.md           # Version history and release notes
-├── 📁 cmd/                   # CLI entry points
-│   ├── 📄 root.go            # Main command + flags
-│   ├── 📄 root_test.go
-│   └── 📄 version.go         # Version subcommand
-│
-├── 📁 core/                  # Business logic
-│   ├── 📁 config/            # Configuration management
-│   │   ├── 📄 config.go      # Config loading with validation
-│   │   └── 📄 config_test.go
-│   │
-│   ├── 📁 db/                # Database operations
-│   │   ├── 📄 connection.go  # PostgreSQL connection management
-│   │   └── 📄 connection_test.go
-│   │
-│   ├── 📁 encoders/          # Row encoding strategies
-│   │   ├── 📄 json_encoder.go # JSON row encoder
-│   │   └── 📄 yaml_encoder.go # YAML row encoder
-│   │
-│   ├── 📁 exporters/         # Export format implementations
-│   │   ├── 📄 exporter.go    # Exporter interface
-│   │   ├── 📄 registry.go    # Format registration system
-│   │   ├── 📄 compression.go # Compression support (gzip/zip)
-│   │   ├── 📄 compression_test.go
-│   │   ├── 📄 csv_exporter.go  # CSV export implementation
-│   │   ├── 📄 csv_exporter_test.go
-│   │   ├── 📄 json_exporter.go # JSON export implementation
-│   │   ├── 📄 json_exporter_test.go
-│   │   ├── 📄 xml_exporter.go  # XML export implementation
-│   │   ├── 📄 xml_exporter_test.go
-│   │   ├── 📄 yaml_exporter.go # YAML export implementation
-│   │   ├── 📄 sql_exporter.go  # SQL export implementation
-│   │   ├── 📄 sql_exporter_test.go
-│   │   └── 📄 testing_helpers.go
-│   │
-│   ├── 📁 formatters/        # Data type formatting
-│   │   ├── 📄 formatting.go  # Shared formatting utilities
-│   │   └── 📄 formatting_test.go
-│   │
-│   └── 📁 validation/        # Input validation
-│       ├── 📄 query_safety.go      # Query and parameter validation
-│       ├── 📄 query_safety_test.go
-│       ├── 📄 validate_data.go     # Data validation
-│       └── 📄 validate_data_test.go
-│
-├── 📁 internal/              # Private packages
-│   ├── 📁 logger/            # Logging utilities
-│   │   └── 📄 logger.go      # Structured logging with verbose mode
-│   └── 📁 version/           # Build information
-│       └── 📄 version.go     # Version, BuildTime, GitCommit
-│
-├── 📁 test/                  # Test resources
-│   └── 📄 init.sql           # Test database initialization
-│
-├── 📄 docker-compose.yml     # Docker setup for testing
-├── 📄 go.mod                 # Go module definition
-├── 📄 go.sum                 # Go module checksums
-├── 📄 LICENSE                # MIT license
-├── 📄 main.go                # Application entry point
-├── 📜 README.md              # This file
-└── 📄 Taskfile.yml           # Build automation
-```
-
-## 🧩 Architecture
-
-The project follows a clean, layered architecture with clear separation of concerns:
-
-```mermaid
-flowchart TD
- A[CLI - Cobra] --> B[cmd/root.goCommand Handler]
-  B --> C[core/configConfiguration]
-  B --> D[core/dbDB Connection]
-  B --> E[core/exporterExport Logic]
-  
-  E --> E0[registry.goFormat Registry]
-  E0 --> E1[CSV Exporter]
-  E0 --> E2[JSON Exporter]
-  E0 --> E3[XML Exporter]
-  E0 --> E4[YAML Exporter]
-  E0 --> E5[SQL Exporter]
-  
-  E --> F[formatting.goShared Utils]
-  E --> G[compression.gogzip/zip]
-  
-  B --> H[internal/loggerLogging]
-  B --> I[internal/versionBuild Info]
-  
-  D --> J[core/validationQuery Safety]
-  
-  style B fill:#e1f5ff
-  style E fill:#ffe1f5
-  style D fill:#f5ffe1
-  style C fill:#fff4e1
-```
-
-**Architecture Principles:**
-
-- **Layered Structure**: Clear separation between CLI, business logic, and utilities
-- **Pluggable Exporters**: Registry pattern allows easy addition of new formats
-- **SOLID Principles**: Each package has a single, well-defined responsibility
-- **Testability**: Modular design facilitates comprehensive testing
-
-### Key Design Patterns
-
-1. **Registry Pattern**: Exporters self-register at init time, enabling dynamic format support
-2. **Factory Pattern**: Each export creates a fresh instance, avoiding state sharing
-3. **Strategy Pattern**: Exporters implement a common interface for interchangeable behavior
-4. **Dependency Injection**: Components receive dependencies rather than creating them
 
 ## 🛠️ Development
 

@@ -118,7 +118,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
 
 	// BEHAVIOR OPTIONS
-	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
+	rootCmd.Flags().BoolVarP(&failOnEmpty, "fail-on-empty", "x", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 

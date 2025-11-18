@@ -175,7 +175,7 @@ pgxport [command] [flags]
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
 | `--xml-row-tag` | - | Sets the row element name for XML exports | `row` | No |
-| `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
+| `--fail-on-empty` | `-x` | Exit with error if query returns 0 rows | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
 | `--insert-batch` | - | Number of rows per INSERT statement for SQL exports | `1` | No |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |

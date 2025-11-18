@@ -37,7 +37,7 @@ var (
 	rowPerStatement int
 	// Connection flags
 	dbHost     string
-	dbPort     string
+	dbPort     int
 	dbUser     string
 	dbName     string
 	dbPassword string
@@ -83,7 +83,7 @@ Supported output formats:
 func init() {
 	// Connection flags (PostgreSQL-compatible)
 	rootCmd.Flags().StringVarP(&dbHost, "host", "H", "", "Database host (overrides .env and environment)")
-	rootCmd.Flags().StringVarP(&dbPort, "port", "P", "", "Database port (overrides .env and environment)")
+	rootCmd.Flags().IntVarP(&dbPort, "port", "P", 5432, "Database port (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbUser, "user", "u", "", "Database username (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbName, "database", "d", "", "Database name (overrides .env and environment)")
 	rootCmd.Flags().StringVarP(&dbPassword, "password", "p", "", "Database password (overrides .env and environment)")
@@ -107,7 +107,10 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 
-	rootCmd.MarkFlagRequired("output")
+	if err := rootCmd.MarkFlagRequired("output"); err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
 	rootCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		logger.Debug("Validating export parameters")
@@ -155,7 +158,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 			cfg.DBHost = dbHost
 			logger.Debug("Overriding DB host from flag: %s", dbHost)
 		}
-		if dbPort != "" {
+		if dbPort != 5432 {
 			cfg.DBPort = dbPort
 			logger.Debug("Overriding DB port from flag: %s", dbPort)
 		}

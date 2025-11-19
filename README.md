@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/fbz-tec/pgxport)](https://goreportcard.com/report/github.com/fbz-tec/pgxport)
 [![License](https://img.shields.io/github/license/fbz-tec/pgxport.svg)](LICENSE)
 
-A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON ,YAML ,SQL).
+A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON ,YAML ,XLSX ,SQL).
 
 ---
 
@@ -32,7 +32,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to **CSV**, **JSON**, **XML**, **YAML** and **SQL** 
+- 📊 Export to **CSV**, **JSON**, **XML**, **YAML** ,  **SQL** and **Microsoft Excel (XLSX)**
 - ⚡ High-performance CSV export using PostgreSQL native **COPY** mode (`--with-copy`)
 - 🔧 Customizable CSV delimiter and header
 - 🗜️ Compression: **gzip** / **zip** 
@@ -171,7 +171,7 @@ pgxport [command] [flags]
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-D` | CSV delimiter character | `,` | No |
-| `--no-header` | `-n` | Skip CSV header row in output | `false` | No |
+| `--no-header` | `-n` | Skip header row in output (CSV and XLSX) | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
 | `--xml-row-tag` | - | Sets the row element name for XML exports | `row` | No |
@@ -202,6 +202,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | XML | ✅ | ✅ | ❌ |
 | YAML | ✅ | ✅ | ❌ |
 | SQL | ✅ | ✅ | ❌ |
+| XLSX | ✅ | ❌ | ❌ |
 
 ### Common Flags (All Formats)
 - `--compression` - Enable compression (gzip/zip)
@@ -220,6 +221,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | **SQL** | `--table`<br>`--insert-batch` | Target table name (required)<br>Rows per INSERT statement |
 | **JSON** | *(none)* | Uses only common flags |
 | **YAML** | *(none)* | Uses only common flags |
+| **XLSX** | `--no-header` | Skip header row |
 
 ### Examples
 
@@ -260,10 +262,16 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_ba
 pgxport -s "SELECT * FROM products" -o products.yaml -f yaml
 
 # Export with gzip compression
-pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
+pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z gzip
 
 # Export with zip compression (creates logs.zip containing logs.csv)
-pgxport -s "SELECT * FROM logs" -o logs.zip -f csv -z zip
+pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z zip
+
+# Export to Excel XLSX format
+pgxport -s "SELECT * FROM products" -o products.xlsx -f xlsx
+
+# Export XLSX with compression
+pgxport -s "SELECT * FROM large_dataset" -o data.xlsx -f xlsx -z gzip
 
 # Check version
 pgxport version
@@ -552,6 +560,32 @@ pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
 ```
 
 **Note:** When using `--with-copy`, PostgreSQL handles type serialization. Date and timestamp formats may differ from standard CSV export.
+
+### XLSX
+
+- **Excel spreadsheet format** with native Excel compatibility
+- **Headers in bold** for better readability (can be skipped with `--no-header`)
+- **Streaming export** for optimal memory usage with large datasets
+- **Native Excel date/time handling** - uses Excel's internal date format
+- NULL values exported as empty cells
+
+**XLSX Format Features:**
+- ✅ **Native Excel format**: Directly openable in Microsoft Excel, LibreOffice, Google Sheets
+- ✅ **Professional styling**: Column headers automatically formatted in bold
+- ✅ **Streaming architecture**: Handles large datasets efficiently without memory issues
+- ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL
+- ✅ **Native date handling**: Dates and timestamps use Excel's native date format for proper Excel compatibility
+- ✅ **Compression compatible**: Works with gzip and zip compression
+- ✅ **Multi-sheet ready**: Single sheet export (future: multi-sheet support)
+
+**Note:** XLSX format uses Excel's native date/time handling. The `--time-format` and `--time-zone` options are not applied to maintain proper Excel compatibility.
+
+**Use cases:**
+- 📊 Business reports and dashboards
+- 🔄 Data sharing with non-technical users
+- 📈 Financial data exports
+- 🎯 Presentations and visual analysis
+
 
 ### JSON
 
@@ -864,13 +898,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### ✅ Completed
 - `.env` configuration  
 - `--dsn` flag  
-- XML / JSON / SQL / JSON exporters  
+- XML / JSON / SQL / YAML / XLSX exporters  
 - COPY mode  
 - Streaming + compression  
 - Fail-on-empty mode  
 - Batch SQL inserts
 - Individual connection flags
 - Quiet mode
+- XLSX support
 
 
 ### 🚧 Planned

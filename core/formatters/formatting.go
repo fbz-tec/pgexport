@@ -311,6 +311,32 @@ func FormatSQLValue(val interface{}, valueType uint32) string {
 	}
 }
 
+// formatXLSXValue formats a PostgreSQL value for Excel
+func FormatXLSXValue(value interface{}, oid uint32, timeFormat, timeZone string) interface{} {
+
+	if pgtype.DateOID == oid || pgtype.TimestampOID == oid || pgtype.TimestamptzOID == oid {
+		return value
+	}
+
+	if pgtype.JSONBOID == oid || pgtype.JSONOID == oid {
+		jsonStr, err := json.Marshal(value)
+		if err != nil {
+			return "{}"
+		}
+		return string(jsonStr)
+	}
+
+	if val, ok := value.([]interface{}); ok {
+		b, err := json.Marshal(val)
+		if err != nil {
+			return "[]"
+		}
+		return string(b)
+	}
+
+	return formatValueByOID(value, oid, timeFormat, timeZone)
+}
+
 func QuoteIdent(s string) string {
 	parts := strings.Split(s, ".")
 	for i, part := range parts {

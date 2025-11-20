@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/fbz-tec/pgxport)](https://goreportcard.com/report/github.com/fbz-tec/pgxport)
 [![License](https://img.shields.io/github/license/fbz-tec/pgxport.svg)](LICENSE)
 
-A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON, SQL).
+A simple, powerful and efficient CLI tool to export PostgreSQL query results to various formats (CSV, XML, JSON ,YAML ,XLSX ,SQL).
 
 ---
 
@@ -32,12 +32,13 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 - 🚀 Execute SQL queries directly from command line
 - 📄 Run SQL queries from files
-- 📊 Export to **CSV**, **JSON**, **XML**, and **SQL** 
+- 📊 Export to **CSV**, **JSON**, **XML**, **YAML** ,  **SQL** and **Microsoft Excel (XLSX)**
 - ⚡ High-performance CSV export using PostgreSQL native **COPY** mode (`--with-copy`)
 - 🔧 Customizable CSV delimiter and header
 - 🗜️ Compression: **gzip** / **zip** 
 - ⚙️ Simple configuration via environment variables or `.env` file
 - 🔗 DSN connection string support (`--dsn`)
+- 🔗 **Individual connection flags** for maximum flexibility
 - 🛡️ Robust error handling and validation
 - ⚠️ Fail on empty results (`--fail-on-empty`) for scripts & pipelines
 - 🔍 Verbose mode for detailed logging
@@ -114,15 +115,36 @@ Pass the connection string directly via command line:
 ```bash
 pgxport --dsn "postgres://user:pass@host:port/dbname" -s "SELECT * FROM users" -o users.csv
 ```
+### Option 4: Using Individual Connection Flags
+
+For maximum flexibility, specify each connection parameter individually:
+```bash
+pgxport --user postgres --host localhost --port 5432 --database mydb --password secret \
+        -s "SELECT * FROM users" -o users.csv
+```
+
+**Available flags:**
+- `--host` : Database host
+- `--port` : Database port
+- `--user` : Database username  
+- `--database` : Database name
+- `--password` : Database password
+
+**Advantages:**
+- ✅ Mix with `.env` file (override only what you need)
+- ✅ Compatible with shell variables
+- ✅ Fine-grained control over each parameter
+- ✅ Perfect for CI/CD and scripting
 
 ### Configuration Priority
 
 The system uses the following priority order:
 
-1. `--dsn`
-2. Environment variables
-3. `.env` file
-4. Defaults
+1. **Individual connection flags** (`--host`, `--port`, `--user`, `--database`, `--password`)
+2. **`--dsn` flag**
+3. **Environment variables** (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_NAME`, `DB_PASS`)
+4. **`.env` file**
+5. **Defaults**
 
 ## 📖 Usage
 
@@ -145,21 +167,27 @@ pgxport [command] [flags]
 | `--sql` | `-s` | SQL query to execute | - | * |
 | `--sqlfile` | `-F` | Path to SQL file | - | * |
 | `--output` | `-o` | Output file path | - | ✓ |
-| `--format` | `-f` | Output format (csv, json, xml, sql) | `csv` | No |
+| `--format` | `-f` | Output format (csv, json, yaml, xml, sql) | `csv` | No |
 | `--time-format` | `-T` | Custom date/time format | `yyyy-MM-dd HH:mm:ss` | No |
 | `--time-zone` | `-Z` | Time zone for date/time conversion | Local | No |
 | `--delimiter` | `-D` | CSV delimiter character | `,` | No |
-| `--no-header` | - | Skip CSV header row in output | `false` | No |
+| `--no-header` | `-n` | Skip header row in output (CSV and XLSX) | `false` | No |
 | `--with-copy` | - | Use PostgreSQL native COPY for CSV export (faster for large datasets) | `false` | No |
 | `--xml-root-tag` | - | Sets the root element name for XML exports | `results` | No |
 | `--xml-row-tag` | - | Sets the row element name for XML exports | `row` | No |
-| `--fail-on-empty` | - | Exit with error if query returns 0 rows | `false` | No |
+| `--fail-on-empty` | `-x` | Exit with error if query returns 0 rows | `false` | No |
 | `--table` | `-t` | Table name for SQL INSERT exports (supports schema.table) | - | For SQL format |
 | `--insert-batch` | - | Number of rows per INSERT statement for SQL exports | `1` | No |
 | `--compression` | `-z` | Compression (none, gzip, zip) | `none` | No |
 | `--dsn` | - | Database connection string | - | No |
 | `--verbose` | `-v` | Enable verbose output with detailed debug information | `false` | No |
+| `--quiet` | `-q` | Suppress all output except errors | `false` | No |
 | `--help` | `-h` | Show help message | - | No |
+| `--host` |`-H` | Database host | `localhost` | No* |
+| `--port` |`-P` | Database port | `5432` | No* |
+| `--user` |`-u`| Database username | - | No* |
+| `--database` |`-d` | Database name | - | No* |
+| `--password` |`-p` | Database password | - | No* |
 
 _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 
@@ -172,7 +200,9 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | CSV | ✅ | ✅ | ✅ |
 | JSON | ✅ | ✅ | ❌ |
 | XML | ✅ | ✅ | ❌ |
+| YAML | ✅ | ✅ | ❌ |
 | SQL | ✅ | ✅ | ❌ |
+| XLSX | ✅ | ❌ | ❌ |
 
 ### Common Flags (All Formats)
 - `--compression` - Enable compression (gzip/zip)
@@ -180,6 +210,7 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 - `--time-zone` - Timezone conversion
 - `--fail-on-empty` - Fail if query returns 0 rows
 - `--verbose` - Detailed logging
+- `--quiet` - Suppress all output except errors
 
 ### Format-Specific Flags
 
@@ -189,6 +220,8 @@ _* Either `--sql` or `--sqlfile` must be provided (but not both)_
 | **XML** | `--xml-root-tag`<br>`--xml-row-tag` | Customize root element name<br>Customize row element name |
 | **SQL** | `--table`<br>`--insert-batch` | Target table name (required)<br>Rows per INSERT statement |
 | **JSON** | *(none)* | Uses only common flags |
+| **YAML** | *(none)* | Uses only common flags |
+| **XLSX** | `--no-header` | Skip header row |
 
 ### Examples
 
@@ -225,23 +258,23 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 # Export to SQL INSERT statements with schema
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_backup
 
-# Export with gzip compression (creates logs.csv.gz file)
+# Export to YAML format
+pgxport -s "SELECT * FROM products" -o products.yaml -f yaml
+
+# Export with gzip compression
 pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z gzip
 
 # Export with zip compression (creates logs.zip containing logs.csv)
 pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z zip
 
+# Export to Excel XLSX format
+pgxport -s "SELECT * FROM products" -o products.xlsx -f xlsx
+
+# Export XLSX with compression
+pgxport -s "SELECT * FROM large_dataset" -o data.xlsx -f xlsx -z gzip
+
 # Check version
 pgxport version
-```
-
-#### Using Connection String
-
-```bash
-
-pgxport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
-         -s "SELECT * FROM users LIMIT 5" \
-         -o users.csv
 ```
 
 #### Handling Empty Results
@@ -376,7 +409,7 @@ LEFT JOIN orders o ON u.id = o.user_id
 GROUP BY u.id, u.username 
 HAVING COUNT(o.id) > 0
 ORDER BY total_revenue DESC
-" -o user_stats.csv -D ','
+" -o user_stats.csv -d ','
 
 # Export with timestamp in filename
 pgxport -s "SELECT * FROM logs WHERE created_at > NOW() - INTERVAL '24 hours'" \
@@ -412,6 +445,7 @@ pgxport --dsn "$PROD_DATABASE_URL" -s "SELECT * FROM users" -o prod_users.csv
 # Export same data in different formats
 pgxport -s "SELECT * FROM products" -o products.csv -f csv
 pgxport -s "SELECT * FROM products" -o products.json -f json
+pgxport -s "SELECT * FROM products" -o products.yaml -f yaml
 pgxport -s "SELECT * FROM products" -o products.xml -f xml
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 
@@ -527,6 +561,32 @@ pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
 
 **Note:** When using `--with-copy`, PostgreSQL handles type serialization. Date and timestamp formats may differ from standard CSV export.
 
+### XLSX
+
+- **Excel spreadsheet format** with native Excel compatibility
+- **Headers in bold** for better readability (can be skipped with `--no-header`)
+- **Streaming export** for optimal memory usage with large datasets
+- **Native Excel date/time handling** - uses Excel's internal date format
+- NULL values exported as empty cells
+
+**XLSX Format Features:**
+- ✅ **Native Excel format**: Directly openable in Microsoft Excel, LibreOffice, Google Sheets
+- ✅ **Professional styling**: Column headers automatically formatted in bold
+- ✅ **Streaming architecture**: Handles large datasets efficiently without memory issues
+- ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL
+- ✅ **Native date handling**: Dates and timestamps use Excel's native date format for proper Excel compatibility
+- ✅ **Compression compatible**: Works with gzip and zip compression
+- ✅ **Multi-sheet ready**: Single sheet export (future: multi-sheet support)
+
+**Note:** XLSX format uses Excel's native date/time handling. The `--time-format` and `--time-zone` options are not applied to maintain proper Excel compatibility.
+
+**Use cases:**
+- 📊 Business reports and dashboards
+- 🔄 Data sharing with non-technical users
+- 📈 Financial data exports
+- 🎯 Presentations and visual analysis
+
+
 ### JSON
 
 - Pretty-printed with 2-space indentation
@@ -553,6 +613,39 @@ pgxport -s "SELECT * FROM analytics_data" -o analytics.csv -f csv --with-copy
   }
 ]
 ```
+### YAML
+
+- Pretty-printed with 2-space indentation
+- Array format with `-` list items
+- **Default timestamp format**: `yyyy-MM-dd HH:mm:ss` (customizable with `--time-format`)
+- **Timezone**: Local system time (customizable with `--time-zone`)
+- NULL values preserved as `null`
+
+**Example output:**
+```yaml
+- id: 1
+  name: John Doe
+  email: john@example.com
+  created_at: "2024-01-15 10:30:00"
+- id: 2
+  name: Jane Smith
+  email: jane@example.com
+  created_at: "2024-01-16 14:22:15"
+```
+**YAML Format Features:**
+- ✅ **Human-readable**: Clean, indented structure easy to read and edit
+- ✅ **Configuration-friendly**: Ideal for configuration files and data interchange
+- ✅ **Preserves column order**: Maintains the exact order of columns from the query
+- ✅ **Type preservation**: Numbers, booleans, strings, and nulls are properly typed
+- ✅ **All PostgreSQL data types supported**: integers, floats, strings, booleans, timestamps, NULL
+- ✅ **Automatic quoting**: Strings that need quoting are automatically wrapped
+- ✅ **Null handling**: NULL values exported as YAML `null`
+
+**Use cases:**
+- 📋 Configuration files
+- 📊 Data interchange between systems
+- 🔍 Human-readable data exports
+- 🧪 Test fixtures and mock data
 
 ### XML
 
@@ -614,6 +707,7 @@ INSERT INTO "users" ("id", "name", "email", "created_at") VALUES
 - ✅ **Type-aware formatting**: Numbers and booleans without quotes, strings and dates with quotes
 - ✅ **NULL handling**: NULL values exported as SQL `NULL` keyword
 - ✅ **Ready to import**: Generated SQL can be directly executed on any PostgreSQL database
+
 
 ## 🛠️ Development
 
@@ -735,7 +829,11 @@ go vet ./...
    - For production, use environment variables or secrets management
 
 2. **Avoid passwords in command line**:
+   - ❌ Bad: Password visible in process list
+   pgxport --password mysecret --user user --host db.com --database mydb ...
    - ❌ Bad: `pgxport --dsn "postgres://user:password123@host/db" ...` (visible in history)
+   - ✅ Good: Use environment variable
+   export PGPASSWORD=mysecret
    - ✅ Good: Use `.env` file or environment variables
    - ✅ Good: Store DSN in environment: `export DATABASE_URL="..."` then use `pgxport --dsn "$DATABASE_URL" ...`
 
@@ -800,14 +898,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### ✅ Completed
 - `.env` configuration  
 - `--dsn` flag  
-- XML / JSON / SQL exporters  
+- XML / JSON / SQL / YAML / XLSX exporters  
 - COPY mode  
 - Streaming + compression  
 - Fail-on-empty mode  
-- Batch SQL inserts  
+- Batch SQL inserts
+- Individual connection flags
+- Quiet mode
+- XLSX support
+
 
 ### 🚧 Planned
-- [ ] Excel (XLSX) export  
+- [ ] Excel (XLSX) multi-sheet export  
 - [ ] Interactive password prompt  
 - [ ] Pagination for large queries  
 - [ ] Progress bar & export metrics  
@@ -825,6 +927,7 @@ If you encounter any issues or have questions:
 - Built with [Cobra](https://github.com/spf13/cobra) for CLI framework
 - PostgreSQL driver: [pgx](https://github.com/jackc/pgx)
 - Environment variables: [godotenv](https://github.com/joho/godotenv)
+- XLSX library: [Excelize](https://github.com/xuri/excelize)
 - Inspired by the need for simple, reliable data exports
 
 ## ⭐ Show Your Support

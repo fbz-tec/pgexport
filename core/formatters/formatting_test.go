@@ -1,4 +1,4 @@
-package exporters
+package formatters
 
 import (
 	"math/big"
@@ -58,7 +58,7 @@ func TestConvertUserTimeFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertUserTimeFormat(tt.input)
+			result := ConvertUserTimeFormat(tt.input)
 			if result != tt.expected {
 				t.Errorf("convertUserTimeFormat(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
@@ -388,9 +388,9 @@ func TestFormatCSVValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatCSVValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			result := FormatCSVValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
 			if result != tt.expected {
-				t.Errorf("formatCSVValue() = %q, want %q", result, tt.expected)
+				t.Errorf("FormatCSVValue() = %q, want %q", result, tt.expected)
 			}
 		})
 	}
@@ -443,7 +443,7 @@ func TestFormatJSONValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatJSONValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			result := FormatJSONValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
 			if result != tt.expected {
 				t.Errorf("formatJSONValue() = %v, want %v", result, tt.expected)
 			}
@@ -498,7 +498,7 @@ func TestFormatXMLValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatXMLValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
+			result := FormatXMLValue(tt.val, tt.valueType, tt.timefmt, tt.timezone)
 			if result != tt.expected {
 				t.Errorf("formatXMLValue() = %q, want %q", result, tt.expected)
 			}
@@ -641,9 +641,9 @@ func TestFormatSQLValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatSQLValue(tt.value, tt.valueType)
+			result := FormatSQLValue(tt.value, tt.valueType)
 			if result != tt.expected {
-				t.Errorf("formatSQLValue(%v) = %q, want %q", tt.value, result, tt.expected)
+				t.Errorf("FormatSQLValue(%v) = %q, want %q", tt.value, result, tt.expected)
 			}
 		})
 	}
@@ -740,7 +740,7 @@ func TestQuoteIdent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := quoteIdent(tt.input)
+			result := QuoteIdent(tt.input)
 			if result != tt.expected {
 				t.Errorf("quoteIdent(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
@@ -788,7 +788,7 @@ func TestUserTimeZoneFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			layout, loc := userTimeZoneFormat(tt.userTimefmt, tt.timeZone)
+			layout, loc := UserTimeZoneFormat(tt.userTimefmt, tt.timeZone)
 
 			if layout != tt.expectedLayout {
 				t.Errorf("userTimeZoneFormat() layout = %q, want %q", layout, tt.expectedLayout)
@@ -796,117 +796,6 @@ func TestUserTimeZoneFormat(t *testing.T) {
 
 			if loc.String() != tt.expectedLocName {
 				t.Errorf("userTimeZoneFormat() location = %q, want %q", loc.String(), tt.expectedLocName)
-			}
-		})
-	}
-}
-
-func TestValidateTimeFormat(t *testing.T) {
-	tests := []struct {
-		name    string
-		format  string
-		wantErr bool
-	}{
-		{
-			name:    "valid ISO format",
-			format:  "yyyy-MM-dd HH:mm:ss",
-			wantErr: false,
-		},
-		{
-			name:    "valid ISO with milliseconds",
-			format:  "yyyy-MM-ddTHH:mm:ss.SSS",
-			wantErr: false,
-		},
-		{
-			name:    "valid European format",
-			format:  "dd/MM/yyyy HH:mm:ss",
-			wantErr: false,
-		},
-		{
-			name:    "valid US format",
-			format:  "MM/dd/yyyy HH:mm:ss",
-			wantErr: false,
-		},
-		{
-			name:    "valid date only",
-			format:  "yyyy-MM-dd",
-			wantErr: false,
-		},
-		{
-			name:    "valid time only",
-			format:  "HH:mm:ss",
-			wantErr: false,
-		},
-		{
-			name:    "invalid format with wrong pattern",
-			format:  "yyyy-MM-dd HH:mm:ss:invalid",
-			wantErr: false,
-		},
-		{
-			name:    "empty format",
-			format:  "",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateTimeFormat(tt.format)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateTimeFormat(%q) error = %v, wantErr %v", tt.format, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestValidateTimeZone(t *testing.T) {
-	tests := []struct {
-		name     string
-		timezone string
-		wantErr  bool
-	}{
-		{
-			name:     "valid UTC",
-			timezone: "UTC",
-			wantErr:  false,
-		},
-		{
-			name:     "valid America/New_York",
-			timezone: "America/New_York",
-			wantErr:  false,
-		},
-		{
-			name:     "valid Europe/Paris",
-			timezone: "Europe/Paris",
-			wantErr:  false,
-		},
-		{
-			name:     "valid Asia/Tokyo",
-			timezone: "Asia/Tokyo",
-			wantErr:  false,
-		},
-		{
-			name:     "empty timezone is valid",
-			timezone: "",
-			wantErr:  false,
-		},
-		{
-			name:     "invalid timezone",
-			timezone: "Invalid/Timezone",
-			wantErr:  true,
-		},
-		{
-			name:     "gibberish timezone",
-			timezone: "xyzabc123",
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateTimeZone(tt.timezone)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateTimeZone(%q) error = %v, wantErr %v", tt.timezone, err, tt.wantErr)
 			}
 		})
 	}
@@ -964,19 +853,19 @@ func BenchmarkFormatCSVValue(b *testing.B) {
 
 	b.Run("date", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatCSVValue(testDate, pgtype.DateOID, "yyyy-MM-dd", "")
+			FormatCSVValue(testDate, pgtype.DateOID, "yyyy-MM-dd", "")
 		}
 	})
 
 	b.Run("string", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatCSVValue("test string", pgtype.TextOID, "", "")
+			FormatCSVValue("test string", pgtype.TextOID, "", "")
 		}
 	})
 
 	b.Run("float", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatCSVValue(3.14159, pgtype.Float4OID, "", "")
+			FormatCSVValue(3.14159, pgtype.Float4OID, "", "")
 		}
 	})
 }
@@ -986,31 +875,31 @@ func BenchmarkFormatSQLValue(b *testing.B) {
 
 	b.Run("string", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue("test string", pgtype.TextOID)
+			FormatSQLValue("test string", pgtype.TextOID)
 		}
 	})
 
 	b.Run("string_with_quotes", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue("O'Brien's test", pgtype.TextOID)
+			FormatSQLValue("O'Brien's test", pgtype.TextOID)
 		}
 	})
 
 	b.Run("int", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(42, pgtype.Int4OID)
+			FormatSQLValue(42, pgtype.Int4OID)
 		}
 	})
 
 	b.Run("float", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(3.14159, pgtype.Float4OID)
+			FormatSQLValue(3.14159, pgtype.Float4OID)
 		}
 	})
 
 	b.Run("date", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			formatSQLValue(testDate, pgtype.DateOID)
+			FormatSQLValue(testDate, pgtype.DateOID)
 		}
 	})
 }
@@ -1018,19 +907,19 @@ func BenchmarkFormatSQLValue(b *testing.B) {
 func BenchmarkQuoteIdent(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			quoteIdent("users")
+			QuoteIdent("users")
 		}
 	})
 
 	b.Run("schema_table", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			quoteIdent("public.users")
+			QuoteIdent("public.users")
 		}
 	})
 
 	b.Run("with_quotes", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			quoteIdent(`table"name`)
+			QuoteIdent(`table"name`)
 		}
 	})
 }

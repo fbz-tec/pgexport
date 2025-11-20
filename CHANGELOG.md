@@ -2,63 +2,6 @@
 
 All notable changes to pgxport will be documented in this file.
 
-## [v1.0.0] - 2025-01-20
-
-### First Stable Release 🎉
-
-This is the first stable release of pgxport, a powerful CLI tool for exporting PostgreSQL query results to multiple formats.
-
-#### Features
-
-- **Multi-format export support**: CSV, JSON, XML, SQL, and YAML
-- **High-performance CSV export**: PostgreSQL native COPY mode (`--with-copy`) for up to 10× faster exports
-- **Flexible compression**: Support for gzip and zip compression
-- **Advanced date/time handling**:
-  - Customizable formats with `--time-format` flag
-  - Timezone conversion support with `--time-zone` flag
-  - Proper handling of DATE, TIMESTAMP, and TIMESTAMPTZ types
-- **CSV export options**:
-  - Customizable delimiter (`--delimiter`)
-  - Optional header row (`--no-header`)
-  - High-performance COPY mode
-- **XML customization**:
-  - Custom root element with `--xml-root-tag`
-  - Custom row element with `--xml-row-tag`
-- **SQL export features**:
-  - Schema-qualified table names support
-  - Batch INSERT statements (`--insert-batch`) for optimized imports
-  - Proper type casting and escaping
-- **Configuration flexibility**:
-  - `.env` file support
-  - Environment variables
-  - Direct DSN connection string (`--dsn`)
-- **Developer-friendly**:
-  - Verbose mode (`--verbose`) with performance diagnostics
-  - Fail-on-empty mode (`--fail-on-empty`) for automation
-  - Comprehensive error messages
-  - Query validation for safety
-
-## [v1.0.0-rc2] - 2025-11-16
-
-### Second Pre-Release
-
-This release candidate focuses on fixing and stabilizing all date/time and type-handling logic across CSV, JSON, XML and SQL exporters.
-
-#### Fixes & Improvements
-
-- Correct handling of `DATE`, `TIMESTAMP`, and `TIMESTAMPTZ` using PostgreSQL OIDs (`pgtype.DateOID`, `pgtype.TimestampOID`, `pgtype.TimestampTzOID`)
-- Unified formatting logic for all exporters (CSV, JSON, XML, SQL)
-- Fix timezone conversion logic for `TIMESTAMPTZ` with `--time-zone` and `--time-format`
-- Improved export handling of:
-  - `UUID`
-  - `BYTEA`
-  - `NUMERIC`
-  - `INTERVAL`
-  - JSON / JSONB values
-  - PostgreSQL array types
-- Fixed inconsistent formatting between CSV / JSON / XML exporters
-- Added test coverage improvements in `formatting_test.go`
-
 ## [v1.0.0-rc1] - 2025-11-10
 
 ### First Pre-Release
@@ -81,7 +24,7 @@ This is the first pre-release of pgxport.
 
 #### Installation
 
-Download the pre-built binary for your platform from the [releases page](https://github.com/fbz-tec/pgxport/releases/tag/v1.0.0-rc2):
+Download the pre-built binary for your platform from the [releases page](https://github.com/fbz-tec/pgxport/releases/tag/v1.0.0-rc1):
 
 - **Linux (x86_64)**: `pgxport-linux-amd64.tar.gz`
 - **Linux (ARM64)**: `pgxport-linux-arm64.tar.gz`

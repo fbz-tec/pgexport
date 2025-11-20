@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -570,7 +571,8 @@ func TestWriteCSVNoHeader(t *testing.T) {
 				// Check header row
 				if len(records) > 0 {
 					header := records[0]
-					if !contains(header, "id") || !contains(header, "name") || !contains(header, "active") {
+
+					if !slices.Contains(header, "id") || !slices.Contains(header, "name") || !slices.Contains(header, "active") {
 						t.Errorf("Header missing expected columns: %v", header)
 					}
 				}

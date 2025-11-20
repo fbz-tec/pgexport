@@ -32,13 +32,3 @@ func setupTestDB(t *testing.T) (*pgx.Conn, func()) {
 
 	return conn, cleanup
 }
-
-// Helper function to check if a slice contains a string
-func contains(slice []string, str string) bool {
-	for _, v := range slice {
-		if v == str {
-			return true
-		}
-	}
-	return false
-}

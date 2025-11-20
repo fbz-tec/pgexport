@@ -33,12 +33,19 @@ var (
 	failOnEmpty     bool
 	noHeader        bool
 	verbose         bool
+	quiet           bool
 	rowPerStatement int
+	// Connection flags
+	dbHost     string
+	dbPort     int
+	dbUser     string
+	dbName     string
+	dbPassword string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "pgxport",
-	Short: "Export PostgreSQL query results to CSV, JSON, XML, or SQL formats",
+	Short: "Export PostgreSQL query results to CSV, JSON, XML, YAML or SQL formats",
 	Long: `A powerful CLI tool to export PostgreSQL query results.
 It supports direct SQL queries or SQL files, with customizable output options.
 		
@@ -46,6 +53,7 @@ Supported output formats:
  • CSV  — standard text export with customizable delimiter
  • JSON — structured export for API or data processing
  • XML  — hierarchical export for interoperability
+ • YAML — human-readable structured export for configs and tools
  • SQL  — generate INSERT statements`,
 	Example: `  # Export with inline query
   pgxport -s "SELECT * FROM users" -o users.csv
@@ -62,6 +70,9 @@ Supported output formats:
   # Export to XML
   pgxport -s "SELECT * FROM orders" -o orders.xml -f xml
 
+  # Export to YAML
+  pgxport -s "SELECT * FROM user" -o orders.yml -f yaml
+
    # Export to SQL insert statements
   pgxport -s "SELECT * FROM orders" -o orders.sql -f sql -t orders_table`,
 	RunE:          runExport,
@@ -70,31 +81,69 @@ Supported output formats:
 }
 
 func init() {
+	rootCmd.Flags().SortFlags = false
+
+	// Connection flags (PostgreSQL-compatible)
+	rootCmd.Flags().StringVarP(&dbHost, "host", "H", "", "Database host (overrides .env and environment)")
+	rootCmd.Flags().IntVarP(&dbPort, "port", "P", 5432, "Database port (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbUser, "user", "u", "", "Database username (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbName, "database", "d", "", "Database name (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&dbPassword, "password", "p", "", "Database password (overrides .env and environment)")
+	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
+
+	//QUERY INPUT - what to export
 	rootCmd.Flags().StringVarP(&sqlQuery, "sql", "s", "", "SQL query to execute")
 	rootCmd.Flags().StringVarP(&sqlFile, "sqlfile", "F", "", "Path to SQL file containing the query")
+
+	// OUTPUT DESTINATION - where and how to export
 	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file path (required)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "csv", "Output format (csv, json, xml, sql)")
-	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
-	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
-	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
-	rootCmd.Flags().StringVarP(&connString, "dsn", "", "", "Database connection string (postgres://user:pass@host:port/dbname)")
-	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().StringVarP(&compression, "compression", "z", "none", "Compression to apply to the output file (none, gzip, zip)")
+
+	// CSV options
+	rootCmd.Flags().StringVarP(&delimiter, "delimiter", "D", ",", "CSV delimiter character")
 	rootCmd.Flags().BoolVar(&withCopy, "with-copy", false, "Use PostgreSQL native COPY for CSV export (faster for large datasets)")
-	rootCmd.Flags().BoolVar(&failOnEmpty, "fail-on-empty", false, "Exit with error if query returns 0 rows")
-	rootCmd.Flags().BoolVar(&noHeader, "no-header", false, "Skip header row in CSV output")
+	rootCmd.Flags().BoolVarP(&noHeader, "no-header", "n", false, "Skip header row in CSV output")
+
+	// XML options
 	rootCmd.Flags().StringVarP(&xmlRootElement, "xml-root-tag", "", "results", "Sets the root element name for XML exports")
 	rootCmd.Flags().StringVarP(&xmlRowElement, "xml-row-tag", "", "row", "Sets the row element name for XML exports")
+
+	// SQL options
+	rootCmd.Flags().StringVarP(&tableName, "table", "t", "", "Table name for SQL insert exports")
 	rootCmd.Flags().IntVarP(&rowPerStatement, "insert-batch", "", 1, "Number of rows per INSERT statement in SQL export")
+
+	// Date FORMATTING
+	rootCmd.Flags().StringVarP(&timeFormat, "time-format", "T", "yyyy-MM-dd HH:mm:ss", "Custom time format (e.g. yyyy-MM-ddTHH:mm:ss.SSS)")
+	rootCmd.Flags().StringVarP(&timeZone, "time-zone", "Z", "", "Time zone for date/time formatting (e.g. UTC, Europe/Paris). Defaults to local time zone.")
+
+	// BEHAVIOR OPTIONS
+	rootCmd.Flags().BoolVarP(&failOnEmpty, "fail-on-empty", "x", false, "Exit with error if query returns 0 rows")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output with detailed information")
+	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Enable quiet mode: only display error messages")
 
-	rootCmd.MarkFlagRequired("output")
+	if err := rootCmd.MarkFlagRequired("output"); err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		logger.SetVerbose(verbose)
-		if verbose {
-			logger.Debug("Verbose mode enabled")
+	rootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		logger.Debug("Validating export parameters")
+		if err := validateExportParams(); err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
 		}
+		logger.Debug("Export parameters validated successfully")
+		if quiet {
+			logger.SetQuiet(true)
+			logger.SetVerbose(false)
+		} else {
+			logger.SetVerbose(verbose)
+			if verbose {
+				logger.Debug("Verbose mode enabled")
+			}
+		}
+
 	}
 
 	rootCmd.AddCommand(versionCmd)
@@ -113,21 +162,34 @@ func runExport(cmd *cobra.Command, args []string) error {
 	logger.Debug("Initializing pgxport execution environment")
 	logger.Debug("Version: %s, Build: %s, Commit: %s", version.AppVersion, version.BuildTime, version.GitCommit)
 
-	logger.Debug("Validating export parameters")
-
-	if err := validateExportParams(); err != nil {
-		return err
-	}
-
-	logger.Debug("Export parameters validated successfully")
-
 	var dbUrl string
 	if connString != "" {
 		logger.Debug("Using connection string from --dsn flag")
 		dbUrl = connString
 	} else {
-		logger.Debug("Loading configuration from environment")
+		logger.Debug("Loading configuration from environment and flags")
 		cfg := config.LoadConfig()
+		if dbHost != "" {
+			cfg.DBHost = dbHost
+			logger.Debug("Overriding DB host from flag: %s", dbHost)
+		}
+		if dbPort != 5432 {
+			cfg.DBPort = dbPort
+			logger.Debug("Overriding DB port from flag: %s", dbPort)
+		}
+		if dbUser != "" {
+			cfg.DBUser = dbUser
+			logger.Debug("Overriding DB user from flag: %s", dbUser)
+		}
+		if dbName != "" {
+			cfg.DBName = dbName
+			logger.Debug("Overriding DB name from flag: %s", dbName)
+		}
+		if dbPassword != "" {
+			cfg.DBPass = dbPassword
+			logger.Debug("Overriding DB password from flag (hidden)")
+		}
+
 		if err := cfg.Validate(); err != nil {
 			return fmt.Errorf("configuration error: %w", err)
 		}
@@ -222,6 +284,10 @@ func runExport(cmd *cobra.Command, args []string) error {
 }
 
 func validateExportParams() error {
+
+	if verbose && quiet {
+		return fmt.Errorf("error: Cannot use --verbose and --quiet flags together")
+	}
 	// Validate SQL query source
 	if sqlQuery == "" && sqlFile == "" {
 		return fmt.Errorf("error: Either --sql or --sqlfile must be provided")
@@ -277,14 +343,14 @@ func validateExportParams() error {
 
 	// Validate time format if provided
 	if timeFormat != "" {
-		if err := exporters.ValidateTimeFormat(timeFormat); err != nil {
+		if err := validation.ValidateTimeFormat(timeFormat); err != nil {
 			return fmt.Errorf("error: Invalid time format '%s'. Use format like 'yyyy-MM-dd HH:mm:ss'", timeFormat)
 		}
 	}
 
 	// Validate timezone if provided
 	if timeZone != "" {
-		if err := exporters.ValidateTimeZone(timeZone); err != nil {
+		if err := validation.ValidateTimeZone(timeZone); err != nil {
 			return fmt.Errorf("error: Invalid timezone '%s'. Use format like 'UTC' or 'Europe/Paris'", timeZone)
 		}
 	}

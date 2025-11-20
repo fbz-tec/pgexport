@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/formatters"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -68,9 +69,9 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 			return rowCount, fmt.Errorf("error opening <%s>: %w", options.XmlRowElement, err)
 		}
 
-		for i, key := range keys {
-			elem := xml.StartElement{Name: xml.Name{Local: key}}
-			val := formatXMLValue(values[i], fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
+		for i, field := range keys {
+			elem := xml.StartElement{Name: xml.Name{Local: field}}
+			val := formatters.FormatXMLValue(values[i], fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 			if val == "" {
 				if err := encoder.EncodeToken(xml.StartElement{Name: elem.Name}); err != nil {
 					return rowCount, fmt.Errorf("error opening <%s>: %w", elem, err)
@@ -83,17 +84,17 @@ func (e *xmlExporter) Export(rows pgx.Rows, xmlPath string, options ExportOption
 			isJSONLike := strings.HasPrefix(val, "{") || strings.HasPrefix(val, "[") || strings.Contains(val, "\":")
 			if isJSONLike {
 				if err := encoder.EncodeToken(elem); err != nil {
-					return rowCount, fmt.Errorf("error opening <%s>: %w", key, err)
+					return rowCount, fmt.Errorf("error opening <%s>: %w", field, err)
 				}
 				if _, err := bufferedWriter.WriteString(val); err != nil {
-					return rowCount, fmt.Errorf("error writing raw value for <%s>: %w", key, err)
+					return rowCount, fmt.Errorf("error writing raw value for <%s>: %w", field, err)
 				}
 				if err := encoder.EncodeToken(xml.EndElement{Name: elem.Name}); err != nil {
-					return rowCount, fmt.Errorf("error closing </%s>: %w", key, err)
+					return rowCount, fmt.Errorf("error closing </%s>: %w", field, err)
 				}
 			} else {
 				if err := encoder.EncodeElement(val, elem); err != nil {
-					return rowCount, fmt.Errorf("error encoding field %s: %w", key, err)
+					return rowCount, fmt.Errorf("error encoding field %s: %w", field, err)
 				}
 			}
 

@@ -19,7 +19,9 @@ type Logger interface {
 	Error(format string, args ...any)
 	SetOutput(out io.Writer)
 	SetVerbose(enabled bool)
+	SetQuiet(enabled bool)
 	IsVerbose() bool
+	IsQuiet() bool
 }
 
 // ConsoleLogger implements the Logger interface
@@ -27,6 +29,7 @@ type ConsoleLogger struct {
 	output      io.Writer
 	errOut      io.Writer
 	verboseMode bool
+	quietMode   bool
 	mu          sync.Mutex
 }
 
@@ -59,6 +62,14 @@ func IsVerbose() bool {
 	return GetLogger().IsVerbose()
 }
 
+func SetQuiet(quiet bool) {
+	GetLogger().SetQuiet(quiet)
+}
+
+func IsQuiet() bool {
+	return GetLogger().IsQuiet()
+}
+
 // Global helper functions for convenience
 func Info(format string, args ...any)    { GetLogger().Info(format, args...) }
 func Debug(format string, args ...any)   { GetLogger().Debug(format, args...) }
@@ -82,6 +93,16 @@ func (l *ConsoleLogger) SetVerbose(enabled bool) {
 
 func (l *ConsoleLogger) IsVerbose() bool {
 	return l.verboseMode
+}
+
+func (l *ConsoleLogger) SetQuiet(enabled bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.quietMode = enabled
+}
+
+func (l *ConsoleLogger) IsQuiet() bool {
+	return l.quietMode
 }
 
 func (l *ConsoleLogger) timestamp() string {
@@ -110,6 +131,9 @@ const (
 )
 
 func (l *ConsoleLogger) Info(format string, args ...any) {
+	if l.quietMode {
+		return
+	}
 	icon := "ℹ️"
 	if !isTTY {
 		icon = "INFO"
@@ -131,6 +155,9 @@ func (l *ConsoleLogger) Debug(format string, args ...any) {
 }
 
 func (l *ConsoleLogger) Success(format string, args ...any) {
+	if l.quietMode {
+		return
+	}
 	icon := "✓"
 	if !isTTY {
 		icon = "SUCCESS"
@@ -139,6 +166,9 @@ func (l *ConsoleLogger) Success(format string, args ...any) {
 }
 
 func (l *ConsoleLogger) Warn(format string, args ...any) {
+	if l.quietMode {
+		return
+	}
 	icon := "⚠"
 	if !isTTY {
 		icon = "WARN"

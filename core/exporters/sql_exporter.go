@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/formatters"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -31,7 +32,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 	fields := rows.FieldDescriptions()
 	columns := make([]string, len(fields))
 	for i, fd := range fields {
-		columns[i] = quoteIdent(fd.Name)
+		columns[i] = formatters.QuoteIdent(fd.Name)
 	}
 	size := len(columns)
 
@@ -51,7 +52,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 
 		//format values
 		for i, val := range values {
-			record[i] = formatSQLValue(val, fields[i].DataTypeOID)
+			record[i] = formatters.FormatSQLValue(val, fields[i].DataTypeOID)
 		}
 
 		rowCount++
@@ -104,7 +105,7 @@ func writeBatchInsert(writer *bufio.Writer, table string, columns []string, rows
 
 	// Write INSERT header
 	stmt.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES\n",
-		quoteIdent(table), strings.Join(columns, ", ")))
+		formatters.QuoteIdent(table), strings.Join(columns, ", ")))
 
 	// Write value rows
 	for i, record := range rows {

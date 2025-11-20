@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fbz-tec/pgxport/core/formatters"
 	"github.com/fbz-tec/pgxport/internal/logger"
 	"github.com/jackc/pgx/v5"
 )
@@ -37,7 +38,6 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 	defer writer.Flush()
 
 	// Write headers
-
 	fields := rows.FieldDescriptions()
 
 	if !options.NoHeader {
@@ -75,7 +75,7 @@ func (e *csvExporter) Export(rows pgx.Rows, csvPath string, options ExportOption
 		//format values to strings
 		record := make([]string, len(values))
 		for i, v := range values {
-			record[i] = formatCSVValue(v, fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
+			record[i] = formatters.FormatCSVValue(v, fields[i].DataTypeOID, options.TimeFormat, options.TimeZone)
 		}
 
 		rowCount++

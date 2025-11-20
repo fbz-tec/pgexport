@@ -1,4 +1,4 @@
-package exporters
+package formatters
 
 import (
 	"encoding/json"
@@ -53,19 +53,19 @@ func formatValueByOID(val interface{}, valueType uint32, userTimefmt string, tim
 	case pgtype.DateOID:
 		if t, ok := val.(time.Time); ok {
 			dateFmt := extractUserDateFormat(userTimefmt)
-			layout := convertUserTimeFormat(dateFmt)
+			layout := ConvertUserTimeFormat(dateFmt)
 			return t.Format(layout)
 		}
 
 	case pgtype.TimestampOID:
 		if t, ok := val.(time.Time); ok {
-			layout := convertUserTimeFormat(userTimefmt)
+			layout := ConvertUserTimeFormat(userTimefmt)
 			return t.Format(layout)
 		}
 
 	case pgtype.TimestamptzOID:
 		if t, ok := val.(time.Time); ok {
-			layout, loc := userTimeZoneFormat(userTimefmt, timeZone)
+			layout, loc := UserTimeZoneFormat(userTimefmt, timeZone)
 			return t.In(loc).Format(layout)
 		}
 
@@ -104,7 +104,7 @@ func formatValueByOID(val interface{}, valueType uint32, userTimefmt string, tim
 		}
 
 	case pgtype.JSONBOID, pgtype.JSONOID:
-		// Return as-is for JSON export, will be marshaled for CSV/XML
+		// Return as-is for JSON export, will be marshaled for CSV/XML/YAML
 		return val
 	}
 
@@ -113,12 +113,12 @@ func formatValueByOID(val interface{}, valueType uint32, userTimefmt string, tim
 }
 
 // formatJSONValue formats a value for JSON export
-func formatJSONValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) interface{} {
+func FormatJSONValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) interface{} {
 	return formatValueByOID(val, valueType, userTimefmt, timeZone)
 }
 
 // formatCSVValue formats a value for CSV export
-func formatCSVValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
+func FormatCSVValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
 	result := formatValueByOID(val, valueType, userTimefmt, timeZone)
 
 	if result == nil {
@@ -160,7 +160,7 @@ func formatCSVValue(val interface{}, valueType uint32, userTimefmt string, timeZ
 }
 
 // formatXMLValue formats a value for XML export
-func formatXMLValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
+func FormatXMLValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) string {
 	result := formatValueByOID(val, valueType, userTimefmt, timeZone)
 
 	if result == nil {
@@ -201,8 +201,13 @@ func formatXMLValue(val interface{}, valueType uint32, userTimefmt string, timeZ
 	}
 }
 
+// formatYAMLValue formats a value for YAML export
+func FormatYAMLValue(val interface{}, valueType uint32, userTimefmt string, timeZone string) interface{} {
+	return formatValueByOID(val, valueType, userTimefmt, timeZone)
+}
+
 // formatSQLValue formats a value for SQL export
-func formatSQLValue(val interface{}, valueType uint32) string {
+func FormatSQLValue(val interface{}, valueType uint32) string {
 	if val == nil {
 		return "NULL"
 	}
@@ -306,8 +311,33 @@ func formatSQLValue(val interface{}, valueType uint32) string {
 	}
 }
 
-// quoteIdent quotes a SQL identifier (table or column name)
-func quoteIdent(s string) string {
+// formatXLSXValue formats a PostgreSQL value for Excel
+func FormatXLSXValue(value interface{}, oid uint32, timeFormat, timeZone string) interface{} {
+
+	if pgtype.DateOID == oid || pgtype.TimestampOID == oid || pgtype.TimestamptzOID == oid {
+		return value
+	}
+
+	if pgtype.JSONBOID == oid || pgtype.JSONOID == oid {
+		jsonStr, err := json.Marshal(value)
+		if err != nil {
+			return "{}"
+		}
+		return string(jsonStr)
+	}
+
+	if val, ok := value.([]interface{}); ok {
+		b, err := json.Marshal(val)
+		if err != nil {
+			return "[]"
+		}
+		return string(b)
+	}
+
+	return formatValueByOID(value, oid, timeFormat, timeZone)
+}
+
+func QuoteIdent(s string) string {
 	parts := strings.Split(s, ".")
 	for i, part := range parts {
 		parts[i] = `"` + strings.ReplaceAll(part, `"`, `""`) + `"`
@@ -315,15 +345,16 @@ func quoteIdent(s string) string {
 	return strings.Join(parts, ".")
 }
 
-// userTimeZoneFormat returns the Go time layout and location for the user's format and timezone
-func userTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Location) {
-	layout := convertUserTimeFormat(userTimefmt)
+func UserTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Location) {
+
+	layout := ConvertUserTimeFormat(userTimefmt)
 
 	if timeZone == "" {
 		return layout, time.Local
 	}
 
 	loc, err := time.LoadLocation(timeZone)
+
 	if err != nil {
 		log.Printf("Warning: Invalid timezone %q, using local time: %v", timeZone, err)
 		return layout, time.Local
@@ -332,8 +363,7 @@ func userTimeZoneFormat(userTimefmt string, timeZone string) (string, *time.Loca
 	return layout, loc
 }
 
-// convertUserTimeFormat converts user-friendly format to Go time format
-func convertUserTimeFormat(userTimefmt string) string {
+func ConvertUserTimeFormat(userTimefmt string) string {
 	return timeFormatReplacer.Replace(userTimefmt)
 }
 
@@ -358,40 +388,4 @@ func extractUserDateFormat(userFmt string) string {
 		return userFmt
 	}
 	return strings.TrimSpace(userFmt[:last])
-}
-
-// ValidateTimeFormat validates that a time format is valid by testing it
-func ValidateTimeFormat(format string) error {
-	// Empty format is invalid
-	if format == "" {
-		return fmt.Errorf("time format cannot be empty")
-	}
-
-	// Test the format with a known time
-	testTime := time.Date(2006, 1, 2, 15, 4, 5, 123456789, time.UTC)
-	layout := convertUserTimeFormat(format)
-
-	// Try to format and parse back
-	formatted := testTime.Format(layout)
-	_, err := time.Parse(layout, formatted)
-
-	if err != nil {
-		return fmt.Errorf("invalid time format %q: %w", format, err)
-	}
-
-	return nil
-}
-
-// ValidateTimeZone checks if a timezone string is valid
-func ValidateTimeZone(timezone string) error {
-	if timezone == "" {
-		return nil // Empty is valid (uses Local)
-	}
-
-	_, err := time.LoadLocation(timezone)
-	if err != nil {
-		return fmt.Errorf("invalid timezone %q: %w", timezone, err)
-	}
-
-	return nil
 }

@@ -12,7 +12,7 @@ import (
 
 const (
 	DefaultDBHost   = "localhost"
-	DefaultDBPort   = "5432"
+	DefaultDBPort   = 5432
 	DefaultDBUser   = "postgres"
 	DefaultDBName   = "postgres"
 	DefaultDBDriver = "postgres"
@@ -23,7 +23,7 @@ type Config struct {
 	DBUser   string
 	DBPass   string
 	DBHost   string
-	DBPort   string
+	DBPort   int
 	DBName   string
 	SSLMode  string
 }
@@ -37,7 +37,7 @@ func LoadConfig() Config {
 		DBUser:   getEnvOrDefault("DB_USER", DefaultDBUser),
 		DBPass:   os.Getenv("DB_PASS"),
 		DBHost:   getEnvOrDefault("DB_HOST", DefaultDBHost),
-		DBPort:   getEnvOrDefault("DB_PORT", DefaultDBPort),
+		DBPort:   getEnvOrDefaultInt("DB_PORT", DefaultDBPort),
 		DBName:   getEnvOrDefault("DB_NAME", DefaultDBName),
 		SSLMode:  os.Getenv("DB_SSLMODE"),
 	}
@@ -45,7 +45,7 @@ func LoadConfig() Config {
 
 func (c Config) Validate() error {
 
-	if port, err := strconv.Atoi(c.DBPort); err != nil || port < 1 || port > 65535 {
+	if c.DBPort < 1 || c.DBPort > 65535 {
 		return fmt.Errorf("DB_PORT must be a valid port number (1-65535)")
 	}
 
@@ -68,7 +68,7 @@ func (c Config) GetConnectionString() string {
 	u := &url.URL{
 		Scheme: c.DBDriver,
 		User:   url.UserPassword(c.DBUser, c.DBPass),
-		Host:   fmt.Sprintf("%s:%s", c.DBHost, c.DBPort),
+		Host:   fmt.Sprintf("%s:%d", c.DBHost, c.DBPort),
 		Path:   c.DBName,
 	}
 	q := u.Query()
@@ -82,6 +82,16 @@ func (c Config) GetConnectionString() string {
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvOrDefaultInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		p, err := strconv.Atoi(value)
+		if err == nil {
+			return p
+		}
 	}
 	return defaultValue
 }

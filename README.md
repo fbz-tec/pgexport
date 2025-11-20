@@ -49,7 +49,7 @@ A simple, powerful and efficient CLI tool to export PostgreSQL query results to 
 
 ### Prerequisites
 
-- Go 1.19 or higher
+- Go 1.20 or higher
 - PostgreSQL database access
 
 ### Option 1: Install via `go install` (Recommended)
@@ -225,11 +225,11 @@ pgxport -s "SELECT * FROM products" -o products.sql -f sql -t products_backup
 # Export to SQL INSERT statements with schema
 pgxport -s "SELECT * FROM products" -o products.sql -f sql -t public.products_backup
 
-# Export with gzip compression
-pgxport -s "SELECT * FROM logs" -o logs.csv.gz -f csv -z gzip
+# Export with gzip compression (creates logs.csv.gz file)
+pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z gzip
 
 # Export with zip compression (creates logs.zip containing logs.csv)
-pgxport -s "SELECT * FROM logs" -o logs.zip -f csv -z zip
+pgxport -s "SELECT * FROM logs" -o logs.csv -f csv -z zip
 
 # Check version
 pgxport version
@@ -238,15 +238,10 @@ pgxport version
 #### Using Connection String
 
 ```bash
-# Long form
+
 pgxport --dsn "postgres://myuser:mypass@localhost:5432/mydb" \
          -s "SELECT * FROM users LIMIT 5" \
          -o users.csv
-
-# Override .env with different database
-pgxport --dsn "postgres://readonly:pass@replica:5432/mydb" \
-         -s "SELECT * FROM large_table" \
-         -o export.csv
 ```
 
 #### Handling Empty Results

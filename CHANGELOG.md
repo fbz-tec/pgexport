@@ -2,6 +2,42 @@
 
 All notable changes to pgxport will be documented in this file.
 
+## [v1.0.0] - 2025-01-20
+
+### First Stable Release 🎉
+
+This is the first stable release of pgxport, a powerful CLI tool for exporting PostgreSQL query results to multiple formats.
+
+#### Features
+
+- **Multi-format export support**: CSV, JSON, XML, SQL, and YAML
+- **High-performance CSV export**: PostgreSQL native COPY mode (`--with-copy`) for up to 10× faster exports
+- **Flexible compression**: Support for gzip and zip compression
+- **Advanced date/time handling**:
+  - Customizable formats with `--time-format` flag
+  - Timezone conversion support with `--time-zone` flag
+  - Proper handling of DATE, TIMESTAMP, and TIMESTAMPTZ types
+- **CSV export options**:
+  - Customizable delimiter (`--delimiter`)
+  - Optional header row (`--no-header`)
+  - High-performance COPY mode
+- **XML customization**:
+  - Custom root element with `--xml-root-tag`
+  - Custom row element with `--xml-row-tag`
+- **SQL export features**:
+  - Schema-qualified table names support
+  - Batch INSERT statements (`--insert-batch`) for optimized imports
+  - Proper type casting and escaping
+- **Configuration flexibility**:
+  - `.env` file support
+  - Environment variables
+  - Direct DSN connection string (`--dsn`)
+- **Developer-friendly**:
+  - Verbose mode (`--verbose`) with performance diagnostics
+  - Fail-on-empty mode (`--fail-on-empty`) for automation
+  - Comprehensive error messages
+  - Query validation for safety
+
 ## [v1.0.0-rc2] - 2025-11-16
 
 ### Second Pre-Release

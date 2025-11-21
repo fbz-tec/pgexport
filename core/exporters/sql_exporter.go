@@ -60,7 +60,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 
 		// Write batch when full
 		if len(batchInsertValues) == options.RowPerStatement {
-			if err := writeBatchInsert(bufferedWriter, options.TableName, columns, batchInsertValues); err != nil {
+			if err := e.writeBatchInsert(bufferedWriter, options.TableName, columns, batchInsertValues); err != nil {
 				return 0, fmt.Errorf("error writing batch statement %d: %w", statementCount+1, err)
 			}
 			statementCount++
@@ -76,7 +76,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 
 	// Write remaining rows as final batch
 	if len(batchInsertValues) > 0 {
-		if err := writeBatchInsert(bufferedWriter, options.TableName, columns, batchInsertValues); err != nil {
+		if err := e.writeBatchInsert(bufferedWriter, options.TableName, columns, batchInsertValues); err != nil {
 			return 0, fmt.Errorf("error writing final batch statement: %w", err)
 		}
 		statementCount++
@@ -96,7 +96,7 @@ func (e *sqlExporter) Export(rows pgx.Rows, sqlPath string, options ExportOption
 }
 
 // writeBatchInsert writes a single or multi-row INSERT statement
-func writeBatchInsert(writer *bufio.Writer, table string, columns []string, rows [][]string) error {
+func (e *sqlExporter) writeBatchInsert(writer *bufio.Writer, table string, columns []string, rows [][]string) error {
 	if len(rows) == 0 {
 		return nil
 	}
